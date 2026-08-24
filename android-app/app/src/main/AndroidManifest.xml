@@ -12,7 +12,8 @@
         android:label="@string/app_name"
         android:roundIcon="@drawable/ic_smarturban_logo"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SmartUrban">
+        android:theme="@style/Theme.SmartUrban"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".SplashActivity"
@@ -26,6 +27,14 @@
 
         <activity
             android:name=".LoginActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".RegisterActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".DashboardActivity"
             android:exported="false" />
 
     </application>

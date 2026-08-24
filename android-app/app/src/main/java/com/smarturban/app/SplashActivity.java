@@ -5,32 +5,29 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import androidx.appcompat.app.AppCompatActivity;
+import com.smarturban.app.storage.TokenManager;
 
 public class SplashActivity extends AppCompatActivity {
 
-    private static final int SPLASH_DELAY = 2000;
+    private static final int SPLASH_DELAY = 1500;
+    private TokenManager tokenManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
 
+        tokenManager = new TokenManager(this);
+
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            boolean isAuthenticated = checkAuthenticationState();
             Intent intent;
-            if (isAuthenticated) {
-                // Future dashboard activity
-                intent = new Intent(SplashActivity.this, LoginActivity.class);
+            if (tokenManager.isLoggedIn()) {
+                intent = new Intent(SplashActivity.this, DashboardActivity.class);
             } else {
                 intent = new Intent(SplashActivity.this, LoginActivity.class);
             }
             startActivity(intent);
             finish();
         }, SPLASH_DELAY);
-    }
-
-    private boolean checkAuthenticationState() {
-        // Will check SharedPreferences/TokenManager in future phase
-        return false;
     }
 }
