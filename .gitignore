@@ -1,0 +1,27 @@
+# Build outputs
+**/target/
+**/build/
+.gradle/
+**/bin/
+**/out/
+
+# IDE / Editor files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets & Local Configs
+*.env
+local.properties
+
+# Logs
+*.log

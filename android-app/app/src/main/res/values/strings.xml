@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">SmartUrban</string>
+    <string name="app_full_name">SmartUrban Complaint System</string>
+    <string name="tagline">Cleaner Cities • Better Living</string>
+    <string name="welcome_back">Welcome Back</string>
+    <string name="login_subtitle">Sign in to report issues and track progress</string>
+    <string name="email_or_username">Email / Username</string>
+    <string name="password">Password</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="remember_me">Remember me</string>
+    <string name="login">LOGIN</string>
+    <string name="dont_have_account">Don\'t have an account?</string>
+    <string name="register">REGISTER</string>
+</resources>
