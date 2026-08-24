@@ -14,8 +14,8 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import com.smarturban.app.api.RetrofitClient;
 import com.smarturban.app.model.ApiResponse;
-import com.smarturban.app.model.AuthResponse;
 import com.smarturban.app.model.RegisterRequest;
+import com.smarturban.app.model.UserResponse;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -75,9 +75,9 @@ public class RegisterActivity extends AppCompatActivity {
         showLoading(true);
 
         RegisterRequest registerRequest = new RegisterRequest(fullName, email, phone, password, confirmPassword, address);
-        RetrofitClient.getApiService(this).register(registerRequest).enqueue(new Callback<ApiResponse<AuthResponse>>() {
+        RetrofitClient.getApiService(this).register(registerRequest).enqueue(new Callback<ApiResponse<UserResponse>>() {
             @Override
-            public void onResponse(@NonNull Call<ApiResponse<AuthResponse>> call, @NonNull Response<ApiResponse<AuthResponse>> response) {
+            public void onResponse(@NonNull Call<ApiResponse<UserResponse>> call, @NonNull Response<ApiResponse<UserResponse>> response) {
                 showLoading(false);
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     Toast.makeText(RegisterActivity.this, "Registration successful! Please log in.", Toast.LENGTH_LONG).show();
@@ -98,7 +98,7 @@ public class RegisterActivity extends AppCompatActivity {
             }
 
             @Override
-            public void onFailure(@NonNull Call<ApiResponse<AuthResponse>> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<ApiResponse<UserResponse>> call, @NonNull Throwable t) {
                 showLoading(false);
                 Toast.makeText(RegisterActivity.this, "Unable to connect to server. Please check connection.", Toast.LENGTH_LONG).show();
             }

@@ -30,7 +30,7 @@ public class AuthAndUserTest {
 
     @Test
     public void testFullAuthenticationFlow() throws Exception {
-        // 1. Register User
+        // 1. Register User (No JWT token returned during registration)
         RegisterRequest registerRequest = new RegisterRequest(
                 "Test Citizen",
                 "citizen@smarturban.com",
@@ -40,23 +40,22 @@ public class AuthAndUserTest {
                 "123 Smart Street"
         );
 
-        MvcResult regResult = mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.email").value("citizen@smarturban.com"))
-                .andExpect(jsonPath("$.data.token").exists())
-                .andReturn();
+                .andExpect(jsonPath("$.data.token").doesNotExist());
 
-        // 2. Duplicate Registration Fail
+        // 2. Duplicate Registration Rejection (HTTP 409 Conflict)
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(registerRequest)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false));
 
-        // 3. Login
+        // 3. Login with Correct Password -> Returns JWT token
         LoginRequest loginRequest = new LoginRequest("citizen@smarturban.com", "Password@123");
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -69,7 +68,7 @@ public class AuthAndUserTest {
         String responseString = loginResult.getResponse().getContentAsString();
         String token = objectMapper.readTree(responseString).path("data").path("token").asText();
 
-        // 4. Invalid Password Login Fail
+        // 4. Login with Incorrect Password -> HTTP 401 Unauthorized
         LoginRequest badLogin = new LoginRequest("citizen@smarturban.com", "WrongPassword");
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -77,11 +76,12 @@ public class AuthAndUserTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false));
 
-        // 5. Access Protected Endpoint without JWT -> 403 Forbidden (or 401 depending on Security setup)
+        // 5. Access Protected Endpoint without JWT -> HTTP 401 Unauthorized
         mockMvc.perform(get("/api/users/me"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
 
-        // 6. Access Protected Endpoint with valid JWT -> 200 OK
+        // 6. Access Protected Endpoint with valid JWT -> HTTP 200 OK
         mockMvc.perform(get("/api/users/me")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())

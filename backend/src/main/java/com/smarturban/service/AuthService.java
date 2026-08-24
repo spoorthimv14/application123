@@ -3,6 +3,7 @@ package com.smarturban.service;
 import com.smarturban.dto.AuthResponse;
 import com.smarturban.dto.LoginRequest;
 import com.smarturban.dto.RegisterRequest;
+import com.smarturban.dto.UserResponse;
 import com.smarturban.entity.Role;
 import com.smarturban.entity.User;
 import com.smarturban.exception.DuplicateEmailException;
@@ -29,7 +30,7 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
     }
 
-    public AuthResponse register(RegisterRequest request) {
+    public UserResponse register(RegisterRequest request) {
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new IllegalArgumentException("Passwords do not match");
         }
@@ -48,10 +49,8 @@ public class AuthService {
         );
 
         User savedUser = userRepository.save(user);
-        String token = jwtService.generateToken(savedUser.getId(), savedUser.getEmail(), savedUser.getRole().name());
 
-        return new AuthResponse(
-                token,
+        return new UserResponse(
                 savedUser.getId(),
                 savedUser.getFullName(),
                 savedUser.getEmail(),
