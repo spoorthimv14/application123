@@ -1,16 +1,17 @@
 package com.smarturban.service;
 
 import com.smarturban.dto.ComplaintRequest;
-import org.springframework.transaction.annotation.Transactional;
 import com.smarturban.dto.ComplaintResponse;
 import com.smarturban.dto.ComplaintStatsResponse;
 import com.smarturban.entity.Complaint;
 import com.smarturban.entity.ComplaintStatus;
+import com.smarturban.entity.Role;
 import com.smarturban.entity.User;
 import com.smarturban.repository.ComplaintRepository;
 import com.smarturban.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -79,7 +80,7 @@ public class ComplaintService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         // Normal users can only view their own complaints
-        if (!complaint.getUser().getId().equals(user.getId())) {
+        if (!complaint.getUser().getId().equals(user.getId()) && user.getRole() != Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to this complaint");
         }
 
@@ -93,7 +94,14 @@ public class ComplaintService {
                 .toList();
     }
 
-    public ComplaintResponse updateComplaintStatus(Long id, ComplaintStatus status) {
+    public ComplaintResponse updateComplaintStatus(Long id, String email, ComplaintStatus status) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (user.getRole() != Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Normal users are not authorized to update complaint statuses");
+        }
+
         Complaint complaint = complaintRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Complaint not found with id: " + id));
 

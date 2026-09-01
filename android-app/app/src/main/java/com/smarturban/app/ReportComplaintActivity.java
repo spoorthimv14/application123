@@ -7,6 +7,9 @@ import android.graphics.Bitmap;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.preference.PreferenceManager;
 import android.provider.MediaStore;
 import android.view.View;
 import android.widget.*;
@@ -17,13 +20,11 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapView;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.location.Priority;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
@@ -31,6 +32,14 @@ import com.smarturban.app.api.RetrofitClient;
 import com.smarturban.app.model.ApiResponse;
 import com.smarturban.app.model.Complaint;
 import com.smarturban.app.model.ComplaintRequest;
+
+import org.osmdroid.config.Configuration;
+import org.osmdroid.events.MapEventsReceiver;
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.MapEventsOverlay;
+import org.osmdroid.views.overlay.Marker;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -45,7 +54,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class ReportComplaintActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class ReportComplaintActivity extends AppCompatActivity {
 
     private static final int PERMISSION_LOCATION_REQUEST_CODE = 1001;
     private static final int PERMISSION_CAMERA_REQUEST_CODE = 1002;
@@ -64,7 +73,9 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
     private ProgressBar progressBarReport;
 
     private FusedLocationProviderClient fusedLocationClient;
-    private GoogleMap googleMap;
+    private LocationCallback locationCallback;
+    private Marker currentMarker;
+
     private Double selectedLatitude = null;
     private Double selectedLongitude = null;
 
@@ -74,16 +85,17 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Configuration.getInstance().load(getApplicationContext(), PreferenceManager.getDefaultSharedPreferences(getApplicationContext()));
+
         setContentView(R.layout.activity_report_complaint);
 
         initViews();
         setupCategorySpinner();
         setupListeners();
+        setupMap();
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
-        mapView.onCreate(savedInstanceState);
-        mapView.getMapAsync(this);
     }
 
     private void initViews() {
@@ -103,6 +115,26 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
         btnGetLocation = findViewById(R.id.btnGetLocation);
         btnSubmit = findViewById(R.id.btnSubmit);
         progressBarReport = findViewById(R.id.progressBarReport);
+    }
+
+    private void setupMap() {
+        mapView.setTileSource(TileSourceFactory.MAPNIK);
+        mapView.setMultiTouchControls(true);
+        mapView.getController().setZoom(15.0);
+
+        MapEventsOverlay mapEventsOverlay = new MapEventsOverlay(new MapEventsReceiver() {
+            @Override
+            public boolean singleTapConfirmedHelper(GeoPoint p) {
+                updateLocationUI(p.getLatitude(), p.getLongitude(), "Selected location on map ✓");
+                return true;
+            }
+
+            @Override
+            public boolean longPressHelper(GeoPoint p) {
+                return false;
+            }
+        });
+        mapView.getOverlays().add(0, mapEventsOverlay);
     }
 
     private void setupCategorySpinner() {
@@ -178,47 +210,104 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_LOCATION_REQUEST_CODE);
         } else {
-            getCurrentLocation();
+            requestFreshLocation();
         }
     }
 
-    private void getCurrentLocation() {
-        tvLocationStatus.setText("Detecting location...");
+    private void requestFreshLocation() {
+        tvLocationStatus.setText("Requesting fresh GPS location...");
+        btnGetLocation.setEnabled(false);
+
+        if (locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
+        }
+
+        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
+                .setMinUpdateIntervalMillis(1000)
+                .setMaxUpdates(1)
+                .build();
+
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(@NonNull LocationResult locationResult) {
+                btnGetLocation.setEnabled(true);
+                if (locationResult.getLastLocation() != null) {
+                    Location loc = locationResult.getLastLocation();
+                    updateLocationUI(loc.getLatitude(), loc.getLongitude(), "Fresh location detected ✓");
+                } else {
+                    fallbackToLastLocation();
+                }
+            }
+        };
+
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
+
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                btnGetLocation.setEnabled(true);
+                if (selectedLatitude == null) {
+                    fallbackToLastLocation();
+                }
+            }, 10000);
+
+        } catch (SecurityException e) {
+            btnGetLocation.setEnabled(true);
+            tvLocationStatus.setText("Location permission denied. Please grant permission.");
+        }
+    }
+
+    private void fallbackToLastLocation() {
         try {
             fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
                 if (location != null) {
-                    updateLocationUI(location.getLatitude(), location.getLongitude());
+                    updateLocationUI(location.getLatitude(), location.getLongitude(), "Location detected ✓");
                 } else {
-                    tvLocationStatus.setText("Unable to detect location. Please ensure GPS is enabled.");
+                    tvLocationStatus.setText("Location unavailable. Please enable GPS and try again or tap the map.");
+                    mapContainer.setVisibility(View.VISIBLE);
                 }
-            }).addOnFailureListener(e -> tvLocationStatus.setText("Location error: " + e.getMessage()));
+            }).addOnFailureListener(e -> {
+                tvLocationStatus.setText("GPS error: " + e.getMessage());
+                mapContainer.setVisibility(View.VISIBLE);
+            });
         } catch (SecurityException e) {
-            tvLocationStatus.setText("Location permission denied");
+            tvLocationStatus.setText("Location permission denied.");
         }
     }
 
-    private void updateLocationUI(double lat, double lng) {
+    private void updateLocationUI(double lat, double lng, String statusMsg) {
         selectedLatitude = lat;
         selectedLongitude = lng;
-        tvLocationStatus.setText("Location detected ✓");
+        tvLocationStatus.setText(statusMsg);
         tvCoordinates.setText(String.format("Lat: %.6f, Long: %.6f", lat, lng));
         mapContainer.setVisibility(View.VISIBLE);
 
-        if (googleMap != null) {
-            LatLng pos = new LatLng(lat, lng);
-            googleMap.clear();
-            googleMap.addMarker(new MarkerOptions().position(pos).title("Complaint Location"));
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(pos, 15f));
-        }
-    }
+        GeoPoint point = new GeoPoint(lat, lng);
 
-    @Override
-    public void onMapReady(@NonNull GoogleMap map) {
-        googleMap = map;
-        googleMap.getUiSettings().setZoomControlsEnabled(true);
-        if (selectedLatitude != null && selectedLongitude != null) {
-            updateLocationUI(selectedLatitude, selectedLongitude);
+        if (currentMarker != null) {
+            mapView.getOverlays().remove(currentMarker);
         }
+
+        currentMarker = new Marker(mapView);
+        currentMarker.setPosition(point);
+        currentMarker.setTitle("Selected Complaint Location");
+        currentMarker.setDraggable(true);
+        currentMarker.setOnMarkerDragListener(new Marker.OnMarkerDragListener() {
+            @Override
+            public void onMarkerDrag(Marker marker) {}
+
+            @Override
+            public void onMarkerDragEnd(Marker marker) {
+                GeoPoint newPos = marker.getPosition();
+                updateLocationUI(newPos.getLatitude(), newPos.getLongitude(), "Marker dragged to new location ✓");
+            }
+
+            @Override
+            public void onMarkerDragStart(Marker marker) {}
+        });
+
+        mapView.getOverlays().add(currentMarker);
+        mapView.getController().setCenter(point);
+        mapView.invalidate();
     }
 
     @Override
@@ -262,9 +351,10 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_LOCATION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                getCurrentLocation();
+                requestFreshLocation();
             } else {
-                tvLocationStatus.setText("Location permission denied. Cannot capture location.");
+                tvLocationStatus.setText("Location permission denied. Cannot auto-detect location.");
+                mapContainer.setVisibility(View.VISIBLE);
             }
         } else if (requestCode == PERMISSION_CAMERA_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -297,7 +387,7 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
         }
 
         if (selectedLatitude == null || selectedLongitude == null) {
-            Toast.makeText(this, "Please capture location before submitting", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Please select/capture complaint location before submitting", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -329,7 +419,7 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
                     startActivity(intent);
                     finish();
                 } else {
-                    Toast.makeText(ReportComplaintActivity.this, "Submission failed. Please try again.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(ReportComplaintActivity.this, "Submission failed. Please check image or details.", Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -352,17 +442,8 @@ public class ReportComplaintActivity extends AppCompatActivity implements OnMapR
     protected void onPause() {
         super.onPause();
         mapView.onPause();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        mapView.onDestroy();
-    }
-
-    @Override
-    public void onLowMemory() {
-        super.onLowMemory();
-        mapView.onLowMemory();
+        if (locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
+        }
     }
 }

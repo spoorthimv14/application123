@@ -2,6 +2,7 @@ package com.smarturban.app;
 
 import android.graphics.Color;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -9,24 +10,23 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapView;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.smarturban.app.api.RetrofitClient;
 import com.smarturban.app.model.ApiResponse;
 import com.smarturban.app.model.Complaint;
+
+import org.osmdroid.config.Configuration;
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.Marker;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class ComplaintDetailActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class ComplaintDetailActivity extends AppCompatActivity {
 
     private ImageButton btnBackDetail;
     private ProgressBar progressBarDetail;
@@ -36,20 +36,21 @@ public class ComplaintDetailActivity extends AppCompatActivity implements OnMapR
     private ImageView imgDetailPhoto;
     private MapView detailMapView;
 
-    private GoogleMap googleMap;
     private Complaint currentComplaint;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Configuration.getInstance().load(getApplicationContext(), PreferenceManager.getDefaultSharedPreferences(getApplicationContext()));
+
         setContentView(R.layout.activity_complaint_detail);
 
         initViews();
 
         btnBackDetail.setOnClickListener(v -> finish());
 
-        detailMapView.onCreate(savedInstanceState);
-        detailMapView.getMapAsync(this);
+        setupMap();
 
         long complaintId = getIntent().getLongExtra("complaint_id", -1);
         if (complaintId != -1) {
@@ -74,6 +75,12 @@ public class ComplaintDetailActivity extends AppCompatActivity implements OnMapR
         tvDetailTimestamps = findViewById(R.id.tvDetailTimestamps);
         imgDetailPhoto = findViewById(R.id.imgDetailPhoto);
         detailMapView = findViewById(R.id.detailMapView);
+    }
+
+    private void setupMap() {
+        detailMapView.setTileSource(TileSourceFactory.MAPNIK);
+        detailMapView.setMultiTouchControls(true);
+        detailMapView.getController().setZoom(15.0);
     }
 
     private void fetchComplaintDetails(long id) {
@@ -139,20 +146,18 @@ public class ComplaintDetailActivity extends AppCompatActivity implements OnMapR
     }
 
     private void updateMapLocation() {
-        if (googleMap != null && currentComplaint != null &&
-                currentComplaint.getLatitude() != null && currentComplaint.getLongitude() != null) {
-            LatLng pos = new LatLng(currentComplaint.getLatitude(), currentComplaint.getLongitude());
-            googleMap.clear();
-            googleMap.addMarker(new MarkerOptions().position(pos).title(currentComplaint.getComplaintNumber()));
-            googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(pos, 15f));
-        }
-    }
+        if (currentComplaint != null && currentComplaint.getLatitude() != null && currentComplaint.getLongitude() != null) {
+            GeoPoint point = new GeoPoint(currentComplaint.getLatitude(), currentComplaint.getLongitude());
+            detailMapView.getOverlays().clear();
 
-    @Override
-    public void onMapReady(@NonNull GoogleMap map) {
-        googleMap = map;
-        googleMap.getUiSettings().setZoomControlsEnabled(true);
-        updateMapLocation();
+            Marker marker = new Marker(detailMapView);
+            marker.setPosition(point);
+            marker.setTitle(currentComplaint.getComplaintNumber() + " (" + currentComplaint.getCategory() + ")");
+            detailMapView.getOverlays().add(marker);
+
+            detailMapView.getController().setCenter(point);
+            detailMapView.invalidate();
+        }
     }
 
     @Override
@@ -165,17 +170,5 @@ public class ComplaintDetailActivity extends AppCompatActivity implements OnMapR
     protected void onPause() {
         super.onPause();
         detailMapView.onPause();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        detailMapView.onDestroy();
-    }
-
-    @Override
-    public void onLowMemory() {
-        super.onLowMemory();
-        detailMapView.onLowMemory();
     }
 }

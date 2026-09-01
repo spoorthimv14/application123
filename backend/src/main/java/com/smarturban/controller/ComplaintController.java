@@ -91,14 +91,18 @@ public class ComplaintController {
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<ComplaintResponse>> updateComplaintStatus(
             @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam ComplaintStatus status) {
 
-        ComplaintResponse updated = complaintService.updateComplaintStatus(id, status);
+        ComplaintResponse updated = complaintService.updateComplaintStatus(id, userDetails.getUsername(), status);
         return ResponseEntity.ok(ApiResponse.success("Complaint status updated successfully", updated));
     }
 
     @GetMapping("/images/{filename:.+}")
-    public ResponseEntity<Resource> getComplaintImage(@PathVariable String filename) {
+    public ResponseEntity<Resource> getComplaintImage(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable String filename) {
+
         Resource file = fileStorageService.loadFileAsResource(filename);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.getFilename() + "\"")

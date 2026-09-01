@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarturban.dto.ComplaintRequest;
 import com.smarturban.dto.RegisterRequest;
 import com.smarturban.entity.User;
+import com.smarturban.repository.ComplaintRepository;
 import com.smarturban.repository.UserRepository;
 import com.smarturban.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,7 +38,7 @@ public class ComplaintControllerTest {
     private UserRepository userRepository;
 
     @Autowired
-    private com.smarturban.repository.ComplaintRepository complaintRepository;
+    private ComplaintRepository complaintRepository;
 
     @Autowired
     private JwtService jwtService;
@@ -80,16 +82,18 @@ public class ComplaintControllerTest {
     void testCreateComplaintAndGetMyComplaints() throws Exception {
         ComplaintRequest req = new ComplaintRequest("Road/Pothole", "Pothole on Main St", "Deep pothole causing traffic", 12.9716, 77.5946, "Main Street, City");
         MockMultipartFile dataPart = new MockMultipartFile("data", "", "application/json", objectMapper.writeValueAsBytes(req));
+        MockMultipartFile imagePart = new MockMultipartFile("image", "test.jpg", "image/jpeg", "fake image bytes".getBytes());
 
-        String resultStr = mockMvc.perform(multipart("/api/complaints")
+        mockMvc.perform(multipart("/api/complaints")
                 .file(dataPart)
+                .file(imagePart)
                 .header("Authorization", "Bearer " + user1Token))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.title").value("Pothole on Main St"))
                 .andExpect(jsonPath("$.data.status").value("PENDING"))
-                .andExpect(jsonPath("$.data.complaintNumber").exists())
-                .andReturn().getResponse().getContentAsString();
+                .andExpect(jsonPath("$.data.imagePath").exists())
+                .andExpect(jsonPath("$.data.complaintNumber").exists());
 
         // Fetch User 1 complaints
         mockMvc.perform(get("/api/complaints/my")
@@ -105,6 +109,39 @@ public class ComplaintControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void testInvalidFileFormatRejected() throws Exception {
+        ComplaintRequest req = new ComplaintRequest("Garbage/Waste", "Dumped Trash", "Uncollected garbage", 12.9720, 77.5950, "Park Ave");
+        MockMultipartFile dataPart = new MockMultipartFile("data", "", "application/json", objectMapper.writeValueAsBytes(req));
+        MockMultipartFile invalidFilePart = new MockMultipartFile("image", "malicious.exe", "application/x-msdownload", "executable bytes".getBytes());
+
+        mockMvc.perform(multipart("/api/complaints")
+                .file(dataPart)
+                .file(invalidFilePart)
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void testNormalUserCannotUpdateStatus() throws Exception {
+        ComplaintRequest req = new ComplaintRequest("Street Light", "Dark Alley", "Street light non functional", 12.9725, 77.5955, "Alley 4");
+        MockMultipartFile dataPart = new MockMultipartFile("data", "", "application/json", objectMapper.writeValueAsBytes(req));
+
+        String responseContent = mockMvc.perform(multipart("/api/complaints")
+                .file(dataPart)
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Long complaintId = objectMapper.readTree(responseContent).get("data").get("id").asLong();
+
+        // Normal user attempting status change receives 403 Forbidden
+        mockMvc.perform(put("/api/complaints/" + complaintId + "?status=RESOLVED")
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isForbidden());
     }
 
     @Test
