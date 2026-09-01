@@ -14,10 +14,11 @@
 
         <ImageView
             android:id="@+id/imgLogo"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
+            android:adjustViewBounds="true"
             android:contentDescription="@string/app_full_name"
-            android:src="@drawable/ic_smarturban_logo" />
+            android:src="@drawable/smarturban_logo" />
 
         <TextView
             android:layout_width="wrap_content"

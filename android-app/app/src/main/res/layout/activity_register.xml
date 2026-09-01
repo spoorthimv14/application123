@@ -15,11 +15,12 @@
 
         <ImageView
             android:id="@+id/imgLogoRegister"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
             android:layout_marginTop="16dp"
+            android:adjustViewBounds="true"
             android:contentDescription="@string/app_name"
-            android:src="@drawable/ic_smarturban_logo" />
+            android:src="@drawable/smarturban_logo" />
 
         <TextView
             android:layout_width="wrap_content"

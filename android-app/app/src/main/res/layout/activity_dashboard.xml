@@ -15,10 +15,11 @@
 
         <ImageView
             android:id="@+id/imgDashLogo"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:layout_centerVertical="true"
-            android:src="@drawable/ic_smarturban_logo" />
+            android:adjustViewBounds="true"
+            android:src="@drawable/smarturban_logo" />
 
         <TextView
             android:layout_width="wrap_content"
