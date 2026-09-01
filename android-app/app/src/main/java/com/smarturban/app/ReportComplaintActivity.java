@@ -19,12 +19,18 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.Priority;
+import com.google.android.gms.location.SettingsClient;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
@@ -58,6 +64,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
 
     private static final int PERMISSION_LOCATION_REQUEST_CODE = 1001;
     private static final int PERMISSION_CAMERA_REQUEST_CODE = 1002;
+    private static final int REQUEST_CHECK_SETTINGS = 1003;
     private static final int REQUEST_CAMERA_CAPTURE = 2001;
     private static final int REQUEST_GALLERY_PICK = 2002;
 
@@ -78,6 +85,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
 
     private Double selectedLatitude = null;
     private Double selectedLongitude = null;
+    private Float locationAccuracy = null;
 
     private byte[] imageBytes = null;
     private String selectedCategory = "";
@@ -120,12 +128,12 @@ public class ReportComplaintActivity extends AppCompatActivity {
     private void setupMap() {
         mapView.setTileSource(TileSourceFactory.MAPNIK);
         mapView.setMultiTouchControls(true);
-        mapView.getController().setZoom(15.0);
+        mapView.getController().setZoom(16.0);
 
         MapEventsOverlay mapEventsOverlay = new MapEventsOverlay(new MapEventsReceiver() {
             @Override
             public boolean singleTapConfirmedHelper(GeoPoint p) {
-                updateLocationUI(p.getLatitude(), p.getLongitude(), "Selected location on map ✓");
+                updateLocationUI(p.getLatitude(), p.getLongitude(), null, "Selected location on map ✓");
                 return true;
             }
 
@@ -179,7 +187,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
             layoutImagePreview.setVisibility(View.GONE);
         });
 
-        btnGetLocation.setOnClickListener(v -> checkLocationPermissionAndGet());
+        btnGetLocation.setOnClickListener(v -> checkPermissionsAndSettingsThenRequestLocation());
 
         btnSubmit.setOnClickListener(v -> submitComplaint());
     }
@@ -206,36 +214,65 @@ public class ReportComplaintActivity extends AppCompatActivity {
         startActivityForResult(intent, REQUEST_GALLERY_PICK);
     }
 
-    private void checkLocationPermissionAndGet() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSION_LOCATION_REQUEST_CODE);
+    private void checkPermissionsAndSettingsThenRequestLocation() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+            ActivityCompat.requestPermissions(this, new String[]{
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+            }, PERMISSION_LOCATION_REQUEST_CODE);
         } else {
-            requestFreshLocation();
+            verifyLocationSettingsAndStart();
         }
     }
 
-    private void requestFreshLocation() {
-        tvLocationStatus.setText("Requesting fresh GPS location...");
+    private void verifyLocationSettingsAndStart() {
+        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000)
+                .setMinUpdateIntervalMillis(500)
+                .build();
+
+        LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                .addLocationRequest(locationRequest)
+                .setAlwaysShow(true);
+
+        SettingsClient client = LocationServices.getSettingsClient(this);
+        client.checkLocationSettings(builder.build())
+                .addOnSuccessListener(this, locationSettingsResponse -> startHighAccuracyLocationUpdates(locationRequest))
+                .addOnFailureListener(this, e -> {
+                    if (e instanceof ResolvableApiException) {
+                        try {
+                            ResolvableApiException resolvable = (ResolvableApiException) e;
+                            resolvable.startResolutionForResult(ReportComplaintActivity.this, REQUEST_CHECK_SETTINGS);
+                        } catch (Exception sendEx) {
+                            tvLocationStatus.setText("Please enable Location/GPS to continue.");
+                        }
+                    } else {
+                        tvLocationStatus.setText("Please enable Location/GPS to continue.");
+                    }
+                });
+    }
+
+    private void startHighAccuracyLocationUpdates(LocationRequest locationRequest) {
+        tvLocationStatus.setText("Getting your current location...");
         btnGetLocation.setEnabled(false);
 
         if (locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
         }
 
-        LocationRequest locationRequest = new LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
-                .setMinUpdateIntervalMillis(1000)
-                .setMaxUpdates(1)
-                .build();
-
         locationCallback = new LocationCallback() {
             @Override
             public void onLocationResult(@NonNull LocationResult locationResult) {
-                btnGetLocation.setEnabled(true);
                 if (locationResult.getLastLocation() != null) {
                     Location loc = locationResult.getLastLocation();
-                    updateLocationUI(loc.getLatitude(), loc.getLongitude(), "Fresh location detected ✓");
-                } else {
-                    fallbackToLastLocation();
+                    float accuracy = loc.getAccuracy();
+
+                    updateLocationUI(loc.getLatitude(), loc.getLongitude(), accuracy, "Fresh high-accuracy location detected ✓");
+
+                    if (accuracy <= 20.0f) {
+                        stopLocationUpdates();
+                    }
                 }
             }
         };
@@ -245,10 +282,12 @@ public class ReportComplaintActivity extends AppCompatActivity {
 
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 btnGetLocation.setEnabled(true);
+                stopLocationUpdates();
                 if (selectedLatitude == null) {
-                    fallbackToLastLocation();
+                    tvLocationStatus.setText("Unable to get an accurate location. Please move to an open area and try again.");
+                    mapContainer.setVisibility(View.VISIBLE);
                 }
-            }, 10000);
+            }, 8000);
 
         } catch (SecurityException e) {
             btnGetLocation.setEnabled(true);
@@ -256,29 +295,25 @@ public class ReportComplaintActivity extends AppCompatActivity {
         }
     }
 
-    private void fallbackToLastLocation() {
-        try {
-            fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
-                if (location != null) {
-                    updateLocationUI(location.getLatitude(), location.getLongitude(), "Location detected ✓");
-                } else {
-                    tvLocationStatus.setText("Location unavailable. Please enable GPS and try again or tap the map.");
-                    mapContainer.setVisibility(View.VISIBLE);
-                }
-            }).addOnFailureListener(e -> {
-                tvLocationStatus.setText("GPS error: " + e.getMessage());
-                mapContainer.setVisibility(View.VISIBLE);
-            });
-        } catch (SecurityException e) {
-            tvLocationStatus.setText("Location permission denied.");
+    private void stopLocationUpdates() {
+        btnGetLocation.setEnabled(true);
+        if (locationCallback != null) {
+            fusedLocationClient.removeLocationUpdates(locationCallback);
         }
     }
 
-    private void updateLocationUI(double lat, double lng, String statusMsg) {
+    private void updateLocationUI(double lat, double lng, Float accuracy, String statusMsg) {
         selectedLatitude = lat;
         selectedLongitude = lng;
+        locationAccuracy = accuracy;
+
         tvLocationStatus.setText(statusMsg);
-        tvCoordinates.setText(String.format("Lat: %.6f, Long: %.6f", lat, lng));
+        if (accuracy != null) {
+            tvCoordinates.setText(String.format("Lat: %.6f, Long: %.6f\nAccuracy: %.1f m", lat, lng, accuracy));
+        } else {
+            tvCoordinates.setText(String.format("Lat: %.6f, Long: %.6f", lat, lng));
+        }
+
         mapContainer.setVisibility(View.VISIBLE);
 
         GeoPoint point = new GeoPoint(lat, lng);
@@ -298,7 +333,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
             @Override
             public void onMarkerDragEnd(Marker marker) {
                 GeoPoint newPos = marker.getPosition();
-                updateLocationUI(newPos.getLatitude(), newPos.getLongitude(), "Marker dragged to new location ✓");
+                updateLocationUI(newPos.getLatitude(), newPos.getLongitude(), null, "Marker dragged to new location ✓");
             }
 
             @Override
@@ -313,7 +348,13 @@ public class ReportComplaintActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode == RESULT_OK) {
+        if (requestCode == REQUEST_CHECK_SETTINGS) {
+            if (resultCode == RESULT_OK) {
+                checkPermissionsAndSettingsThenRequestLocation();
+            } else {
+                tvLocationStatus.setText("Please enable Location/GPS to continue.");
+            }
+        } else if (resultCode == RESULT_OK) {
             if (requestCode == REQUEST_CAMERA_CAPTURE && data != null) {
                 Bundle extras = data.getExtras();
                 if (extras != null && extras.get("data") instanceof Bitmap) {
@@ -351,7 +392,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_LOCATION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                requestFreshLocation();
+                verifyLocationSettingsAndStart();
             } else {
                 tvLocationStatus.setText("Location permission denied. Cannot auto-detect location.");
                 mapContainer.setVisibility(View.VISIBLE);
@@ -442,8 +483,6 @@ public class ReportComplaintActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         mapView.onPause();
-        if (locationCallback != null) {
-            fusedLocationClient.removeLocationUpdates(locationCallback);
-        }
+        stopLocationUpdates();
     }
 }
