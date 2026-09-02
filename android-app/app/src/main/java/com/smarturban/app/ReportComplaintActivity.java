@@ -152,22 +152,18 @@ public class ReportComplaintActivity extends AppCompatActivity {
     }
 
     private void setupCategorySpinner() {
-        List<String> categories = new ArrayList<>();
-        categories.add("Select Category");
-        categories.addAll(Arrays.asList(
-                "Road/Pothole", "Garbage/Waste", "Street Light", "Water Supply",
-                "Drainage", "Traffic", "Public Toilet", "Park", "Electricity", "Other"
-        ));
+        List<String> categoriesList = new ArrayList<>();
+        categoriesList.add("Loading Categories...");
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categoriesList);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(adapter);
 
         spinnerCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (position > 0) {
-                    selectedCategory = categories.get(position);
+                if (position > 0 && !categoriesList.get(position).startsWith("Loading") && !categoriesList.get(position).startsWith("Select")) {
+                    selectedCategory = categoriesList.get(position);
                 } else {
                     selectedCategory = "";
                 }
@@ -176,6 +172,38 @@ public class ReportComplaintActivity extends AppCompatActivity {
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 selectedCategory = "";
+            }
+        });
+
+        // Dynamically fetch complaint categories from Spring Boot backend API
+        RetrofitClient.getInstance(this).getApi().getCategories().enqueue(new Callback<ApiResponse<List<String>>>() {
+            @Override
+            public void onResponse(Call<ApiResponse<List<String>>> call, Response<ApiResponse<List<String>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                    List<String> fetched = response.body().getData();
+                    categoriesList.clear();
+                    categoriesList.add("Select Category");
+                    if (fetched != null && !fetched.isEmpty()) {
+                        categoriesList.addAll(fetched);
+                    } else {
+                        categoriesList.addAll(Arrays.asList(
+                                "Road/Pothole", "Garbage/Waste", "Street Light", "Water Supply",
+                                "Drainage", "Traffic", "Public Toilet", "Park", "Electricity", "Other"
+                        ));
+                    }
+                    adapter.notifyDataSetChanged();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponse<List<String>>> call, Throwable t) {
+                categoriesList.clear();
+                categoriesList.add("Select Category");
+                categoriesList.addAll(Arrays.asList(
+                        "Road/Pothole", "Garbage/Waste", "Street Light", "Water Supply",
+                        "Drainage", "Traffic", "Public Toilet", "Park", "Electricity", "Other"
+                ));
+                adapter.notifyDataSetChanged();
             }
         });
     }

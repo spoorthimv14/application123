@@ -5,7 +5,9 @@ import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
+import com.bumptech.glide.Glide;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -67,6 +69,19 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.Comp
                 break;
         }
 
+        if (complaint.getImagePath() != null && !complaint.getImagePath().isEmpty()) {
+            holder.imgComplaintThumbnail.setVisibility(View.VISIBLE);
+            String fullImageUrl = "http://10.0.2.2:8080" + complaint.getImagePath();
+            Glide.with(context)
+                    .load(fullImageUrl)
+                    .centerCrop()
+                    .placeholder(R.drawable.smarturban_logo)
+                    .error(R.drawable.smarturban_logo)
+                    .into(holder.imgComplaintThumbnail);
+        } else {
+            holder.imgComplaintThumbnail.setVisibility(View.GONE);
+        }
+
         holder.itemView.setOnClickListener(v -> {
             if (listener != null) {
                 listener.onComplaintClick(complaint);
@@ -81,6 +96,7 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.Comp
 
     static class ComplaintViewHolder extends RecyclerView.ViewHolder {
         TextView tvComplaintNumber, tvStatusBadge, tvCategory, tvTitle, tvDate;
+        ImageView imgComplaintThumbnail;
 
         public ComplaintViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -89,6 +105,7 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.Comp
             tvCategory = itemView.findViewById(R.id.tvCategory);
             tvTitle = itemView.findViewById(R.id.tvTitle);
             tvDate = itemView.findViewById(R.id.tvDate);
+            imgComplaintThumbnail = itemView.findViewById(R.id.imgComplaintThumbnail);
         }
     }
 }

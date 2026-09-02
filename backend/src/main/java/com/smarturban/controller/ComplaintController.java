@@ -27,26 +27,30 @@ public class ComplaintController {
 
     private final ComplaintService complaintService;
     private final FileStorageService fileStorageService;
+    private final com.smarturban.repository.CategoryRepository categoryRepository;
 
-    public ComplaintController(ComplaintService complaintService, FileStorageService fileStorageService) {
+    public ComplaintController(ComplaintService complaintService,
+                               FileStorageService fileStorageService,
+                               com.smarturban.repository.CategoryRepository categoryRepository) {
         this.complaintService = complaintService;
         this.fileStorageService = fileStorageService;
+        this.categoryRepository = categoryRepository;
     }
 
     @GetMapping("/categories")
     public ResponseEntity<ApiResponse<List<String>>> getCategories() {
-        List<String> categories = Arrays.asList(
-                "Road/Pothole",
-                "Garbage/Waste",
-                "Street Light",
-                "Water Supply",
-                "Drainage",
-                "Traffic",
-                "Public Toilet",
-                "Park",
-                "Electricity",
-                "Other"
-        );
+        List<String> categories = categoryRepository.findByActiveTrueOrderByNameAsc()
+                .stream()
+                .map(com.smarturban.entity.Category::getName)
+                .toList();
+
+        if (categories.isEmpty()) {
+            categories = Arrays.asList(
+                    "Road/Pothole", "Garbage/Waste", "Street Light", "Water Supply",
+                    "Drainage", "Traffic", "Public Toilet", "Park", "Electricity", "Other"
+            );
+        }
+
         return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", categories));
     }
 

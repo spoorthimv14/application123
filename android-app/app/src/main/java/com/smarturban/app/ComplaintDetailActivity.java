@@ -7,6 +7,7 @@ import android.view.View;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import com.bumptech.glide.Glide;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -139,6 +140,21 @@ public class ComplaintDetailActivity extends AppCompatActivity {
             tvDetailCoordinates.setText(String.format("Latitude: %.6f, Longitude: %.6f",
                     currentComplaint.getLatitude(), currentComplaint.getLongitude()));
             updateMapLocation();
+        }
+
+        if (currentComplaint.getImagePath() != null && !currentComplaint.getImagePath().isEmpty()) {
+            tvPhotoLabel.setVisibility(View.VISIBLE);
+            imgDetailPhoto.setVisibility(View.VISIBLE);
+            String fullImageUrl = "http://10.0.2.2:8080" + currentComplaint.getImagePath();
+            Glide.with(this)
+                    .load(fullImageUrl)
+                    .centerCrop()
+                    .placeholder(R.drawable.smarturban_logo)
+                    .error(R.drawable.smarturban_logo)
+                    .into(imgDetailPhoto);
+        } else {
+            tvPhotoLabel.setVisibility(View.GONE);
+            imgDetailPhoto.setVisibility(View.GONE);
         }
 
         String createdAtStr = currentComplaint.getCreatedAt() != null ? currentComplaint.getCreatedAt().replace("T", " ") : "";
