@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
@@ -26,11 +28,8 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResponse;
 import com.google.android.gms.location.Priority;
 import com.google.android.gms.location.SettingsClient;
-import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
@@ -59,6 +58,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.Executors;
 
 public class ReportComplaintActivity extends AppCompatActivity {
 
@@ -70,11 +71,11 @@ public class ReportComplaintActivity extends AppCompatActivity {
 
     private Spinner spinnerCategory;
     private TextInputEditText etTitle, etDescription;
-    private MaterialButton btnCamera, btnGallery, btnGetLocation, btnSubmit;
+    private MaterialButton btnCamera, btnGallery, btnGetLocation, btnConfirmLocation, btnSubmit;
     private RelativeLayout layoutImagePreview;
     private ImageView imgPreview;
     private ImageButton btnRemoveImage, btnBack;
-    private TextView tvLocationStatus, tvCoordinates;
+    private TextView tvLocationName, tvLocationStatus, tvCoordinates;
     private FrameLayout mapContainer;
     private MapView mapView;
     private ProgressBar progressBarReport;
@@ -86,6 +87,8 @@ public class ReportComplaintActivity extends AppCompatActivity {
     private Double selectedLatitude = null;
     private Double selectedLongitude = null;
     private Float locationAccuracy = null;
+    private String detectedAddressName = "Location detected";
+    private boolean isLocationConfirmed = false;
 
     private byte[] imageBytes = null;
     private String selectedCategory = "";
@@ -116,11 +119,13 @@ public class ReportComplaintActivity extends AppCompatActivity {
         layoutImagePreview = findViewById(R.id.layoutImagePreview);
         imgPreview = findViewById(R.id.imgPreview);
         btnRemoveImage = findViewById(R.id.btnRemoveImage);
+        tvLocationName = findViewById(R.id.tvLocationName);
         tvLocationStatus = findViewById(R.id.tvLocationStatus);
         tvCoordinates = findViewById(R.id.tvCoordinates);
         mapContainer = findViewById(R.id.mapContainer);
         mapView = findViewById(R.id.mapView);
         btnGetLocation = findViewById(R.id.btnGetLocation);
+        btnConfirmLocation = findViewById(R.id.btnConfirmLocation);
         btnSubmit = findViewById(R.id.btnSubmit);
         progressBarReport = findViewById(R.id.progressBarReport);
     }
@@ -133,6 +138,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
         MapEventsOverlay mapEventsOverlay = new MapEventsOverlay(new MapEventsReceiver() {
             @Override
             public boolean singleTapConfirmedHelper(GeoPoint p) {
+                isLocationConfirmed = false;
                 updateLocationUI(p.getLatitude(), p.getLongitude(), null, "Selected location on map ✓");
                 return true;
             }
@@ -188,6 +194,14 @@ public class ReportComplaintActivity extends AppCompatActivity {
         });
 
         btnGetLocation.setOnClickListener(v -> checkPermissionsAndSettingsThenRequestLocation());
+
+        btnConfirmLocation.setOnClickListener(v -> {
+            if (selectedLatitude != null && selectedLongitude != null) {
+                isLocationConfirmed = true;
+                tvLocationStatus.setText("✓ Location confirmed");
+                Toast.makeText(this, "Location confirmed ✓", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         btnSubmit.setOnClickListener(v -> submitComplaint());
     }
@@ -256,6 +270,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
     private void startHighAccuracyLocationUpdates(LocationRequest locationRequest) {
         tvLocationStatus.setText("Getting your current location...");
         btnGetLocation.setEnabled(false);
+        isLocationConfirmed = false;
 
         if (locationCallback != null) {
             fusedLocationClient.removeLocationUpdates(locationCallback);
@@ -284,7 +299,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
                 btnGetLocation.setEnabled(true);
                 stopLocationUpdates();
                 if (selectedLatitude == null) {
-                    tvLocationStatus.setText("Unable to get an accurate location. Please move to an open area and try again.");
+                    tvLocationStatus.setText("Location accuracy is low. Please try again or move to an open area.");
                     mapContainer.setVisibility(View.VISIBLE);
                 }
             }, 8000);
@@ -307,14 +322,23 @@ public class ReportComplaintActivity extends AppCompatActivity {
         selectedLongitude = lng;
         locationAccuracy = accuracy;
 
-        tvLocationStatus.setText(statusMsg);
+        if (!isLocationConfirmed) {
+            tvLocationStatus.setText(statusMsg);
+        }
+
         if (accuracy != null) {
-            tvCoordinates.setText(String.format("Lat: %.6f, Long: %.6f\nAccuracy: %.1f m", lat, lng, accuracy));
+            if (accuracy > 30.0f) {
+                tvLocationStatus.setText("Location accuracy is low (" + Math.round(accuracy) + "m). Please try again or move to an open area.");
+            }
+            tvCoordinates.setText(String.format("Accuracy: %.1f m | Lat: %.6f, Long: %.6f", accuracy, lat, lng));
         } else {
             tvCoordinates.setText(String.format("Lat: %.6f, Long: %.6f", lat, lng));
         }
 
         mapContainer.setVisibility(View.VISIBLE);
+        btnConfirmLocation.setVisibility(View.VISIBLE);
+
+        reverseGeocodeLocation(lat, lng);
 
         GeoPoint point = new GeoPoint(lat, lng);
 
@@ -332,6 +356,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
 
             @Override
             public void onMarkerDragEnd(Marker marker) {
+                isLocationConfirmed = false;
                 GeoPoint newPos = marker.getPosition();
                 updateLocationUI(newPos.getLatitude(), newPos.getLongitude(), null, "Marker dragged to new location ✓");
             }
@@ -343,6 +368,53 @@ public class ReportComplaintActivity extends AppCompatActivity {
         mapView.getOverlays().add(currentMarker);
         mapView.getController().setCenter(point);
         mapView.invalidate();
+    }
+
+    private void reverseGeocodeLocation(double lat, double lng) {
+        Executors.newSingleThreadExecutor().execute(() -> {
+            String locationName = "Location detected";
+            try {
+                Geocoder geocoder = new Geocoder(ReportComplaintActivity.this, Locale.getDefault());
+                List<Address> addresses = geocoder.getFromLocation(lat, lng, 1);
+                if (addresses != null && !addresses.isEmpty()) {
+                    Address addr = addresses.get(0);
+                    StringBuilder sb = new StringBuilder();
+
+                    if (addr.getThoroughfare() != null) {
+                        sb.append(addr.getThoroughfare()).append(", ");
+                    } else if (addr.getLocality() != null) {
+                        sb.append(addr.getLocality()).append(", ");
+                    }
+
+                    if (addr.getLocality() != null && !sb.toString().contains(addr.getLocality())) {
+                        sb.append(addr.getLocality()).append(", ");
+                    }
+                    if (addr.getAdminArea() != null) {
+                        sb.append(addr.getAdminArea()).append(", ");
+                    }
+                    if (addr.getCountryName() != null) {
+                        sb.append(addr.getCountryName());
+                    }
+
+                    String result = sb.toString().trim();
+                    if (result.endsWith(",")) {
+                        result = result.substring(0, result.length() - 1);
+                    }
+
+                    if (!result.isEmpty()) {
+                        locationName = result;
+                    } else if (addr.getAddressLine(0) != null) {
+                        locationName = addr.getAddressLine(0);
+                    }
+                }
+            } catch (Exception e) {
+                locationName = "Location detected";
+            }
+
+            final String finalLocationName = locationName;
+            detectedAddressName = finalLocationName;
+            runOnUiThread(() -> tvLocationName.setText("📍 " + finalLocationName));
+        });
     }
 
     @Override
@@ -435,7 +507,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
         btnSubmit.setEnabled(false);
         progressBarReport.setVisibility(View.VISIBLE);
 
-        ComplaintRequest requestObj = new ComplaintRequest(selectedCategory, title, description, selectedLatitude, selectedLongitude, "Detected Location");
+        ComplaintRequest requestObj = new ComplaintRequest(selectedCategory, title, description, selectedLatitude, selectedLongitude, detectedAddressName);
         String jsonStr = new Gson().toJson(requestObj);
         RequestBody dataPart = RequestBody.create(MediaType.parse("application/json"), jsonStr);
 

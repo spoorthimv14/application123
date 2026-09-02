@@ -155,12 +155,12 @@
                 app:tint="@color/status_rejected" />
         </RelativeLayout>
 
-        <!-- Location Section -->
+        <!-- Location Section Header -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:text="Location *"
+            android:text="📍 LOCATION *"
             android:textColor="@color/primary_navy"
             android:textSize="14sp"
             android:textStyle="bold" />
@@ -170,7 +170,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             app:cardCornerRadius="8dp"
-            app:cardElevation="1dp">
+            app:cardElevation="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -178,29 +178,52 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
+                <!-- Location Name (Display Name Above Map) -->
+                <TextView
+                    android:id="@+id/tvLocationName"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="📍 Location not detected yet."
+                    android:textColor="@color/primary_navy"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <!-- Location Status & Accuracy -->
                 <TextView
                     android:id="@+id/tvLocationStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="No location selected yet."
+                    android:layout_marginTop="4dp"
+                    android:text="Tap below to acquire GPS position"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
+                <!-- Lat / Long Coordinates -->
                 <TextView
                     android:id="@+id/tvCoordinates"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Lat: --, Long: --"
-                    android:textColor="@color/primary_navy"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
+                    android:text="Latitude: --, Longitude: --"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <!-- Get Fresh Location Button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnGetLocation"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:backgroundTint="@color/accent_orange"
+                    android:text="📍 Use Current Location"
+                    android:textColor="@color/surface_white"
+                    app:cornerRadius="8dp" />
 
                 <!-- Map Frame -->
                 <FrameLayout
                     android:id="@+id/mapContainer"
                     android:layout_width="match_parent"
-                    android:layout_height="180dp"
+                    android:layout_height="220dp"
                     android:layout_marginTop="12dp"
                     android:background="#E2E8F0"
                     android:visibility="gone">
@@ -211,15 +234,18 @@
                         android:layout_height="match_parent" />
                 </FrameLayout>
 
+                <!-- Confirm Location Button -->
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnGetLocation"
+                    android:id="@+id/btnConfirmLocation"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:layout_marginTop="12dp"
-                    android:backgroundTint="@color/accent_orange"
-                    android:text="📍 Use Current Location"
+                    android:backgroundTint="@color/secondary_green_dark"
+                    android:text="✓ CONFIRM LOCATION"
                     android:textColor="@color/surface_white"
+                    android:visibility="gone"
                     app:cornerRadius="8dp" />
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -229,6 +255,7 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="28dp"
+            android:layout_marginBottom="32dp"
             android:backgroundTint="@color/primary_navy"
             android:text="SUBMIT COMPLAINT"
             android:textColor="@color/surface_white"
@@ -240,7 +267,7 @@
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:layout_gravity="center"
-            android:layout_marginTop="16dp"
+            android:layout_marginBottom="32dp"
             android:visibility="gone" />
 
     </LinearLayout>
