@@ -38,6 +38,7 @@ import com.smarturban.app.model.ApiResponse;
 import com.smarturban.app.model.Complaint;
 import com.smarturban.app.model.ComplaintRequest;
 
+import org.json.JSONObject;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.events.MapEventsReceiver;
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
@@ -48,6 +49,8 @@ import org.osmdroid.views.overlay.Marker;
 
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
 import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -60,6 +63,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ReportComplaintActivity extends AppCompatActivity {
 
@@ -89,6 +93,9 @@ public class ReportComplaintActivity extends AppCompatActivity {
     private Float locationAccuracy = null;
     private String detectedAddressName = "Location detected";
     private boolean isLocationConfirmed = false;
+
+    private final AtomicLong geocodeSequence = new AtomicLong(0);
+    private final OkHttpClient httpClient = new OkHttpClient.Builder().build();
 
     private byte[] imageBytes = null;
     private String selectedCategory = "";
@@ -175,7 +182,6 @@ public class ReportComplaintActivity extends AppCompatActivity {
             }
         });
 
-        // Dynamically fetch complaint categories from Spring Boot backend API
         RetrofitClient.getInstance(this).getApi().getCategories().enqueue(new Callback<ApiResponse<List<String>>>() {
             @Override
             public void onResponse(Call<ApiResponse<List<String>>> call, Response<ApiResponse<List<String>>> response) {
@@ -399,49 +405,93 @@ public class ReportComplaintActivity extends AppCompatActivity {
     }
 
     private void reverseGeocodeLocation(double lat, double lng) {
+        final long currentSeq = geocodeSequence.incrementAndGet();
+        tvLocationName.setText("📍 Finding location name...");
+
         Executors.newSingleThreadExecutor().execute(() -> {
-            String locationName = "Location detected";
+            String resolvedAddress = null;
+
+            // 1. Primary Attempt: Native Android Geocoder
             try {
-                Geocoder geocoder = new Geocoder(ReportComplaintActivity.this, Locale.getDefault());
-                List<Address> addresses = geocoder.getFromLocation(lat, lng, 1);
-                if (addresses != null && !addresses.isEmpty()) {
-                    Address addr = addresses.get(0);
-                    StringBuilder sb = new StringBuilder();
+                if (Geocoder.isPresent()) {
+                    Geocoder geocoder = new Geocoder(ReportComplaintActivity.this, Locale.getDefault());
+                    List<Address> addresses = geocoder.getFromLocation(lat, lng, 1);
+                    if (addresses != null && !addresses.isEmpty()) {
+                        Address addr = addresses.get(0);
+                        StringBuilder sb = new StringBuilder();
 
-                    if (addr.getThoroughfare() != null) {
-                        sb.append(addr.getThoroughfare()).append(", ");
-                    } else if (addr.getLocality() != null) {
-                        sb.append(addr.getLocality()).append(", ");
-                    }
+                        if (addr.getThoroughfare() != null) {
+                            sb.append(addr.getThoroughfare()).append(", ");
+                        } else if (addr.getFeatureName() != null && !addr.getFeatureName().matches("^\\d+$")) {
+                            sb.append(addr.getFeatureName()).append(", ");
+                        }
 
-                    if (addr.getLocality() != null && !sb.toString().contains(addr.getLocality())) {
-                        sb.append(addr.getLocality()).append(", ");
-                    }
-                    if (addr.getAdminArea() != null) {
-                        sb.append(addr.getAdminArea()).append(", ");
-                    }
-                    if (addr.getCountryName() != null) {
-                        sb.append(addr.getCountryName());
-                    }
+                        if (addr.getLocality() != null && !sb.toString().contains(addr.getLocality())) {
+                            sb.append(addr.getLocality()).append(", ");
+                        } else if (addr.getSubAdminArea() != null && !sb.toString().contains(addr.getSubAdminArea())) {
+                            sb.append(addr.getSubAdminArea()).append(", ");
+                        }
 
-                    String result = sb.toString().trim();
-                    if (result.endsWith(",")) {
-                        result = result.substring(0, result.length() - 1);
-                    }
+                        if (addr.getAdminArea() != null) {
+                            sb.append(addr.getAdminArea()).append(", ");
+                        }
+                        if (addr.getCountryName() != null) {
+                            sb.append(addr.getCountryName());
+                        }
 
-                    if (!result.isEmpty()) {
-                        locationName = result;
-                    } else if (addr.getAddressLine(0) != null) {
-                        locationName = addr.getAddressLine(0);
+                        String res = sb.toString().trim();
+                        if (res.endsWith(",")) {
+                            res = res.substring(0, res.length() - 1).trim();
+                        }
+
+                        if (!res.isEmpty()) {
+                            resolvedAddress = res;
+                        } else if (addr.getAddressLine(0) != null) {
+                            resolvedAddress = addr.getAddressLine(0);
+                        }
                     }
                 }
-            } catch (Exception e) {
-                locationName = "Location detected";
+            } catch (Exception ignored) {}
+
+            // 2. Secondary Fallback: OpenStreetMap Nominatim API
+            if (resolvedAddress == null) {
+                try {
+                    String url = String.format(Locale.US,
+                            "https://nominatim.openstreetmap.org/reverse?format=json&lat=%.6f&lon=%.6f&zoom=18&addressdetails=1",
+                            lat, lng);
+
+                    Request request = new Request.Builder()
+                            .url(url)
+                            .header("User-Agent", "SmartUrban-App/1.0 (academic.project@smarturban.com)")
+                            .build();
+
+                    try (okhttp3.Response response = httpClient.newCall(request).execute()) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            String jsonString = response.body().string();
+                            JSONObject json = new JSONObject(jsonString);
+                            if (json.has("display_name")) {
+                                resolvedAddress = json.getString("display_name");
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
             }
 
-            final String finalLocationName = locationName;
-            detectedAddressName = finalLocationName;
-            runOnUiThread(() -> tvLocationName.setText("📍 " + finalLocationName));
+            final String finalResultName = resolvedAddress;
+
+            runOnUiThread(() -> {
+                if (currentSeq != geocodeSequence.get()) {
+                    return; // Ignore stale geocoding response
+                }
+
+                if (finalResultName != null && !finalResultName.trim().isEmpty()) {
+                    detectedAddressName = finalResultName;
+                    tvLocationName.setText("📍 " + finalResultName);
+                } else {
+                    detectedAddressName = "Coordinates: " + String.format(Locale.US, "%.6f, %.6f", lat, lng);
+                    tvLocationName.setText("📍 Location name unavailable. Coordinates are available.");
+                }
+            });
         });
     }
 
