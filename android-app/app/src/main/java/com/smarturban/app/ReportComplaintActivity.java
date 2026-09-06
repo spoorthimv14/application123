@@ -8,6 +8,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -59,7 +60,6 @@ import retrofit2.Response;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -146,7 +146,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
             @Override
             public boolean singleTapConfirmedHelper(GeoPoint p) {
                 isLocationConfirmed = false;
-                updateLocationUI(p.getLatitude(), p.getLongitude(), null, "Selected location on map ✓");
+                updateLocationUI(p.getLatitude(), p.getLongitude(), null, false, "Selected location on map ✓");
                 return true;
             }
 
@@ -169,7 +169,9 @@ public class ReportComplaintActivity extends AppCompatActivity {
         spinnerCategory.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                if (position > 0 && !categoriesList.get(position).startsWith("Loading") && !categoriesList.get(position).startsWith("Select")) {
+                if (position > 0 && !categoriesList.get(position).startsWith("Loading")
+                        && !categoriesList.get(position).startsWith("Select")
+                        && !categoriesList.get(position).startsWith("Failed")) {
                     selectedCategory = categoriesList.get(position);
                 } else {
                     selectedCategory = "";
@@ -182,6 +184,10 @@ public class ReportComplaintActivity extends AppCompatActivity {
             }
         });
 
+        fetchCategories(categoriesList, adapter);
+    }
+
+    private void fetchCategories(List<String> categoriesList, ArrayAdapter<String> adapter) {
         RetrofitClient.getInstance(this).getApi().getCategories().enqueue(new Callback<ApiResponse<List<String>>>() {
             @Override
             public void onResponse(Call<ApiResponse<List<String>>> call, Response<ApiResponse<List<String>>> response) {
@@ -191,27 +197,24 @@ public class ReportComplaintActivity extends AppCompatActivity {
                     categoriesList.add("Select Category");
                     if (fetched != null && !fetched.isEmpty()) {
                         categoriesList.addAll(fetched);
-                    } else {
-                        categoriesList.addAll(Arrays.asList(
-                                "Road/Pothole", "Garbage/Waste", "Street Light", "Water Supply",
-                                "Drainage", "Traffic", "Public Toilet", "Park", "Electricity", "Other"
-                        ));
                     }
                     adapter.notifyDataSetChanged();
+                } else {
+                    showCategoryError(categoriesList, adapter);
                 }
             }
 
             @Override
             public void onFailure(Call<ApiResponse<List<String>>> call, Throwable t) {
-                categoriesList.clear();
-                categoriesList.add("Select Category");
-                categoriesList.addAll(Arrays.asList(
-                        "Road/Pothole", "Garbage/Waste", "Street Light", "Water Supply",
-                        "Drainage", "Traffic", "Public Toilet", "Park", "Electricity", "Other"
-                ));
-                adapter.notifyDataSetChanged();
+                showCategoryError(categoriesList, adapter);
             }
         });
+    }
+
+    private void showCategoryError(List<String> categoriesList, ArrayAdapter<String> adapter) {
+        categoriesList.clear();
+        categoriesList.add("Failed to load categories. Tap to retry.");
+        adapter.notifyDataSetChanged();
     }
 
     private void setupListeners() {
@@ -316,8 +319,10 @@ public class ReportComplaintActivity extends AppCompatActivity {
                 if (locationResult.getLastLocation() != null) {
                     Location loc = locationResult.getLastLocation();
                     float accuracy = loc.getAccuracy();
+                    boolean isMock = checkIsMockLocation(loc);
 
-                    updateLocationUI(loc.getLatitude(), loc.getLongitude(), accuracy, "Fresh high-accuracy location detected ✓");
+                    String msg = isMock ? "⚠ Simulated device location" : "Fresh high-accuracy location detected ✓";
+                    updateLocationUI(loc.getLatitude(), loc.getLongitude(), accuracy, isMock, msg);
 
                     if (accuracy <= 20.0f) {
                         stopLocationUpdates();
@@ -344,6 +349,15 @@ public class ReportComplaintActivity extends AppCompatActivity {
         }
     }
 
+    private boolean checkIsMockLocation(Location location) {
+        if (location == null) return false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            return location.isMock();
+        } else {
+            return location.isFromMockProvider();
+        }
+    }
+
     private void stopLocationUpdates() {
         btnGetLocation.setEnabled(true);
         if (locationCallback != null) {
@@ -351,7 +365,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
         }
     }
 
-    private void updateLocationUI(double lat, double lng, Float accuracy, String statusMsg) {
+    private void updateLocationUI(double lat, double lng, Float accuracy, boolean isMock, String statusMsg) {
         selectedLatitude = lat;
         selectedLongitude = lng;
         locationAccuracy = accuracy;
@@ -364,9 +378,10 @@ public class ReportComplaintActivity extends AppCompatActivity {
             if (accuracy > 30.0f) {
                 tvLocationStatus.setText("Location accuracy is low (" + Math.round(accuracy) + "m). Please try again or move to an open area.");
             }
-            tvCoordinates.setText(String.format("Accuracy: %.1f m | Lat: %.6f, Long: %.6f", accuracy, lat, lng));
+            String mockNotice = isMock ? " [Simulated Location]" : "";
+            tvCoordinates.setText(String.format(Locale.US, "Accuracy: %.1f m | Lat: %.6f, Long: %.6f%s", accuracy, lat, lng, mockNotice));
         } else {
-            tvCoordinates.setText(String.format("Lat: %.6f, Long: %.6f", lat, lng));
+            tvCoordinates.setText(String.format(Locale.US, "Lat: %.6f, Long: %.6f", lat, lng));
         }
 
         mapContainer.setVisibility(View.VISIBLE);
@@ -392,7 +407,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
             public void onMarkerDragEnd(Marker marker) {
                 isLocationConfirmed = false;
                 GeoPoint newPos = marker.getPosition();
-                updateLocationUI(newPos.getLatitude(), newPos.getLongitude(), null, "Marker dragged to new location ✓");
+                updateLocationUI(newPos.getLatitude(), newPos.getLongitude(), null, false, "Marker dragged to new location ✓");
             }
 
             @Override
@@ -561,7 +576,7 @@ public class ReportComplaintActivity extends AppCompatActivity {
         String description = etDescription.getText().toString().trim();
 
         if (selectedCategory.isEmpty()) {
-            Toast.makeText(this, "Please select a complaint category", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Please select a valid complaint category", Toast.LENGTH_SHORT).show();
             return;
         }
 
