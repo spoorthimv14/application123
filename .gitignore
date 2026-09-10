@@ -6,13 +6,13 @@ build/
 .gradle/
 **/.gradle/
 android-app/.gradle/
+android-app/app/build/
+backend/target/
 **/bin/
 **/out/
 **/uploads/
 uploads/
 backend/uploads/
-android-app/app/build/
-backend/target/
 
 # IDE / Editor files
 .idea/

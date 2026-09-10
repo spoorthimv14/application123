@@ -148,4 +148,53 @@ public class AdminComplaintControllerTest {
                 .andExpect(jsonPath("$.data.departmentName").value("Public Works Department"))
                 .andExpect(jsonPath("$.data.statusHistory.length()").value(3));
     }
+
+    @Test
+    void testDuplicateStatusAndDepartmentUpdatesAreIdempotent() throws Exception {
+        // 1. Create a complaint
+        ComplaintRequest req = new ComplaintRequest("Street Light", "Dark Corner", "Light bulb broken", 12.9716, 77.5946, "Corner St");
+        MockMultipartFile dataPart = new MockMultipartFile("data", "", "application/json", objectMapper.writeValueAsBytes(req));
+
+        String responseContent = mockMvc.perform(multipart("/api/complaints")
+                .file(dataPart)
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Long complaintId = objectMapper.readTree(responseContent).get("data").get("id").asLong();
+
+        // 2. Assign department
+        AssignDepartmentRequest assignReq = new AssignDepartmentRequest(pwdDepartment.getId(), "Initial assignment");
+        mockMvc.perform(put("/api/admin/complaints/" + complaintId + "/assign")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.statusHistory.length()").value(2)); // PENDING + ASSIGNED
+
+        // 3. Re-assign SAME department (should be idempotent and NOT create duplicate history entry)
+        mockMvc.perform(put("/api/admin/complaints/" + complaintId + "/assign")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.statusHistory.length()").value(2));
+
+        // 4. Update status to IN_PROGRESS
+        StatusUpdateRequest statusReq = new StatusUpdateRequest(ComplaintStatus.IN_PROGRESS, "Work started");
+        mockMvc.perform(put("/api/admin/complaints/" + complaintId + "/status")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(statusReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.statusHistory.length()").value(3)); // PENDING + ASSIGNED + IN_PROGRESS
+
+        // 5. Update status to SAME status IN_PROGRESS (should be idempotent)
+        mockMvc.perform(put("/api/admin/complaints/" + complaintId + "/status")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(statusReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.statusHistory.length()").value(3));
+    }
 }

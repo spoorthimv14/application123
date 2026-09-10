@@ -63,6 +63,10 @@ public class TokenManager {
         return prefs.getString(KEY_USER_EMAIL, "");
     }
 
+    public String getUserRole() {
+        return prefs.getString(KEY_USER_ROLE, "USER");
+    }
+
     public boolean isLoggedIn() {
         return getToken() != null && !getToken().trim().isEmpty();
     }

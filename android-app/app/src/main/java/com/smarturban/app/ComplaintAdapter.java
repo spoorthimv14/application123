@@ -71,7 +71,8 @@ public class ComplaintAdapter extends RecyclerView.Adapter<ComplaintAdapter.Comp
 
         if (complaint.getImagePath() != null && !complaint.getImagePath().isEmpty()) {
             holder.imgComplaintThumbnail.setVisibility(View.VISIBLE);
-            String fullImageUrl = "http://10.0.2.2:8080" + complaint.getImagePath();
+            String imagePath = complaint.getImagePath();
+            String fullImageUrl = imagePath.startsWith("http") ? imagePath : com.smarturban.app.api.RetrofitClient.getBaseUrl() + (imagePath.startsWith("/") ? imagePath.substring(1) : imagePath);
             Glide.with(context)
                     .load(fullImageUrl)
                     .centerCrop()

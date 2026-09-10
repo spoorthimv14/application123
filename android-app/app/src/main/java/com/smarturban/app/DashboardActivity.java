@@ -112,11 +112,12 @@ public class DashboardActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_profile) {
                 String name = tokenManager.getUserName();
                 String email = tokenManager.getUserEmail();
-                boolean isAdmin = "ADMIN".equalsIgnoreCase(name) || "ADMIN".equalsIgnoreCase(email);
+                String role = tokenManager.getUserRole();
+                boolean isAdmin = "ADMIN".equalsIgnoreCase(role);
                 if (isAdmin) {
                     startActivity(new Intent(DashboardActivity.this, AdminDashboardActivity.class));
                 } else {
-                    Toast.makeText(DashboardActivity.this, "Profile: " + name + " (" + email + ")", Toast.LENGTH_LONG).show();
+                    Toast.makeText(DashboardActivity.this, "Profile: " + name + " (" + email + ") - Role: " + role, Toast.LENGTH_LONG).show();
                 }
                 return true;
             }

@@ -141,6 +141,14 @@ public class ComplaintService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Complaint not found with id: " + id));
 
         ComplaintStatus oldStatus = complaint.getStatus();
+
+        // Idempotency check: If status is already current status, do not record duplicate status history
+        if (oldStatus == newStatus) {
+            List<ComplaintStatusHistoryResponse> historyList = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(complaint)
+                    .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+            return ComplaintResponse.fromEntity(complaint, historyList);
+        }
+
         complaint.setStatus(newStatus);
         Complaint saved = complaintRepository.save(complaint);
 
@@ -173,6 +181,13 @@ public class ComplaintService {
 
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department not found with id: " + departmentId));
+
+        // Idempotency check: If department is already assigned, do not record duplicate assignment history
+        if (complaint.getDepartment() != null && complaint.getDepartment().getId().equals(department.getId())) {
+            List<ComplaintStatusHistoryResponse> historyList = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(complaint)
+                    .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+            return ComplaintResponse.fromEntity(complaint, historyList);
+        }
 
         ComplaintStatus oldStatus = complaint.getStatus();
         complaint.setDepartment(department);

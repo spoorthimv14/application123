@@ -189,7 +189,8 @@ public class ComplaintDetailActivity extends AppCompatActivity {
         if (currentComplaint.getImagePath() != null && !currentComplaint.getImagePath().isEmpty()) {
             tvPhotoLabel.setVisibility(View.VISIBLE);
             imgDetailPhoto.setVisibility(View.VISIBLE);
-            String fullImageUrl = "http://10.0.2.2:8080" + currentComplaint.getImagePath();
+            String imagePath = currentComplaint.getImagePath();
+            String fullImageUrl = imagePath.startsWith("http") ? imagePath : RetrofitClient.getBaseUrl() + (imagePath.startsWith("/") ? imagePath.substring(1) : imagePath);
             Glide.with(this)
                     .load(fullImageUrl)
                     .centerCrop()
@@ -215,9 +216,9 @@ public class ComplaintDetailActivity extends AppCompatActivity {
     }
 
     private void setupAdminControlsIfAuthorized() {
-        boolean isAdmin = "ADMIN".equalsIgnoreCase(tokenManager.getUserName()) || "ADMIN".equalsIgnoreCase(tokenManager.getUserEmail());
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(tokenManager.getUserRole());
 
-        // Also show admin card if explicitly opened via Admin flow or if user is ADMIN
+        // Show admin controls if authenticated user has ADMIN role or is opened in admin mode
         if (isAdmin || getIntent().getBooleanExtra("is_admin_mode", false)) {
             cardAdminControls.setVisibility(View.VISIBLE);
             setupAdminSpinnersAndButtons();
