@@ -10,6 +10,9 @@ public class ComplaintStats {
     @SerializedName("pending")
     private long pending;
 
+    @SerializedName("assigned")
+    private long assigned;
+
     @SerializedName("inProgress")
     private long inProgress;
 
@@ -35,6 +38,14 @@ public class ComplaintStats {
 
     public void setPending(long pending) {
         this.pending = pending;
+    }
+
+    public long getAssigned() {
+        return assigned;
+    }
+
+    public void setAssigned(long assigned) {
+        this.assigned = assigned;
     }
 
     public long getInProgress() {

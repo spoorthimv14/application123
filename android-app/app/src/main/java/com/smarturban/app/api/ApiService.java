@@ -1,12 +1,6 @@
 package com.smarturban.app.api;
 
-import com.smarturban.app.model.ApiResponse;
-import com.smarturban.app.model.AuthResponse;
-import com.smarturban.app.model.Complaint;
-import com.smarturban.app.model.ComplaintStats;
-import com.smarturban.app.model.LoginRequest;
-import com.smarturban.app.model.RegisterRequest;
-import com.smarturban.app.model.UserResponse;
+import com.smarturban.app.model.*;
 import okhttp3.MultipartBody;
 import okhttp3.RequestBody;
 import retrofit2.Call;
@@ -28,6 +22,9 @@ public interface ApiService {
     @GET("api/complaints/categories")
     Call<ApiResponse<List<String>>> getCategories();
 
+    @GET("api/departments")
+    Call<ApiResponse<List<Department>>> getDepartments();
+
     @Multipart
     @POST("api/complaints")
     Call<ApiResponse<Complaint>> createComplaint(
@@ -43,4 +40,23 @@ public interface ApiService {
 
     @GET("api/complaints/{id}")
     Call<ApiResponse<Complaint>> getComplaintById(@Path("id") Long id);
+
+    // Admin Endpoints
+    @GET("api/admin/complaints")
+    Call<ApiResponse<List<Complaint>>> getAdminComplaints(@Query("status") String statusFilter);
+
+    @GET("api/admin/complaints/stats")
+    Call<ApiResponse<ComplaintStats>> getAdminStats();
+
+    @PUT("api/admin/complaints/{id}/status")
+    Call<ApiResponse<Complaint>> updateComplaintStatus(
+            @Path("id") Long id,
+            @Body StatusUpdateRequest request
+    );
+
+    @PUT("api/admin/complaints/{id}/assign")
+    Call<ApiResponse<Complaint>> assignDepartment(
+            @Path("id") Long id,
+            @Body AssignDepartmentRequest request
+    );
 }

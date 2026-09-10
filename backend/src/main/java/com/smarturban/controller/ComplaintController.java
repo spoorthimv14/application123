@@ -98,7 +98,7 @@ public class ComplaintController {
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam ComplaintStatus status) {
 
-        ComplaintResponse updated = complaintService.updateComplaintStatus(id, userDetails.getUsername(), status);
+        ComplaintResponse updated = complaintService.updateComplaintStatusByAdmin(id, userDetails.getUsername(), status, null);
         return ResponseEntity.ok(ApiResponse.success("Complaint status updated successfully", updated));
     }
 

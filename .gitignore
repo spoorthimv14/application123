@@ -1,9 +1,18 @@
 # Build outputs
+target/
 **/target/
+build/
 **/build/
 .gradle/
+**/.gradle/
+android-app/.gradle/
 **/bin/
 **/out/
+**/uploads/
+uploads/
+backend/uploads/
+android-app/app/build/
+backend/target/
 
 # IDE / Editor files
 .idea/

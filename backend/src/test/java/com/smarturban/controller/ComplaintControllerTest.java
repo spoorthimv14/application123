@@ -41,6 +41,9 @@ public class ComplaintControllerTest {
     private ComplaintRepository complaintRepository;
 
     @Autowired
+    private com.smarturban.repository.ComplaintStatusHistoryRepository statusHistoryRepository;
+
+    @Autowired
     private JwtService jwtService;
 
     private String user1Token;
@@ -50,6 +53,7 @@ public class ComplaintControllerTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        statusHistoryRepository.deleteAll();
         complaintRepository.deleteAll();
         userRepository.deleteAll();
 

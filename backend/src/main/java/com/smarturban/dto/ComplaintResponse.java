@@ -19,12 +19,19 @@ public class ComplaintResponse {
     private Double longitude;
     private String address;
     private ComplaintStatus status;
+    private Long departmentId;
+    private String departmentName;
+    private java.util.List<ComplaintStatusHistoryResponse> statusHistory;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     public ComplaintResponse() {}
 
     public static ComplaintResponse fromEntity(Complaint complaint) {
+        return fromEntity(complaint, java.util.Collections.emptyList());
+    }
+
+    public static ComplaintResponse fromEntity(Complaint complaint, java.util.List<ComplaintStatusHistoryResponse> historyList) {
         ComplaintResponse dto = new ComplaintResponse();
         dto.setId(complaint.getId());
         dto.setComplaintNumber(complaint.getComplaintNumber());
@@ -40,9 +47,38 @@ public class ComplaintResponse {
         dto.setLongitude(complaint.getLongitude());
         dto.setAddress(complaint.getAddress());
         dto.setStatus(complaint.getStatus());
+        if (complaint.getDepartment() != null) {
+            dto.setDepartmentId(complaint.getDepartment().getId());
+            dto.setDepartmentName(complaint.getDepartment().getName());
+        }
+        dto.setStatusHistory(historyList != null ? historyList : java.util.Collections.emptyList());
         dto.setCreatedAt(complaint.getCreatedAt());
         dto.setUpdatedAt(complaint.getUpdatedAt());
         return dto;
+    }
+
+    public Long getDepartmentId() {
+        return departmentId;
+    }
+
+    public void setDepartmentId(Long departmentId) {
+        this.departmentId = departmentId;
+    }
+
+    public String getDepartmentName() {
+        return departmentName;
+    }
+
+    public void setDepartmentName(String departmentName) {
+        this.departmentName = departmentName;
+    }
+
+    public java.util.List<ComplaintStatusHistoryResponse> getStatusHistory() {
+        return statusHistory;
+    }
+
+    public void setStatusHistory(java.util.List<ComplaintStatusHistoryResponse> statusHistory) {
+        this.statusHistory = statusHistory;
     }
 
     public Long getId() {

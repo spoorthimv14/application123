@@ -43,6 +43,10 @@ public class Complaint {
     @Column(nullable = false, length = 20)
     private ComplaintStatus status;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -165,6 +169,14 @@ public class Complaint {
 
     public void setStatus(ComplaintStatus status) {
         this.status = status;
+    }
+
+    public Department getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(Department department) {
+        this.department = department;
     }
 
     public LocalDateTime getCreatedAt() {

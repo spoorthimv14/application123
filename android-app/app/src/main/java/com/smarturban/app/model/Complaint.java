@@ -40,6 +40,15 @@ public class Complaint {
     @SerializedName("status")
     private String status;
 
+    @SerializedName("departmentId")
+    private Long departmentId;
+
+    @SerializedName("departmentName")
+    private String departmentName;
+
+    @SerializedName("statusHistory")
+    private java.util.List<ComplaintStatusHistory> statusHistory;
+
     @SerializedName("createdAt")
     private String createdAt;
 
@@ -142,6 +151,30 @@ public class Complaint {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Long getDepartmentId() {
+        return departmentId;
+    }
+
+    public void setDepartmentId(Long departmentId) {
+        this.departmentId = departmentId;
+    }
+
+    public String getDepartmentName() {
+        return departmentName;
+    }
+
+    public void setDepartmentName(String departmentName) {
+        this.departmentName = departmentName;
+    }
+
+    public java.util.List<ComplaintStatusHistory> getStatusHistory() {
+        return statusHistory;
+    }
+
+    public void setStatusHistory(java.util.List<ComplaintStatusHistory> statusHistory) {
+        this.statusHistory = statusHistory;
     }
 
     public String getCreatedAt() {

@@ -4,6 +4,7 @@ public class ComplaintStatsResponse {
 
     private long total;
     private long pending;
+    private long assigned;
     private long inProgress;
     private long resolved;
     private long rejected;
@@ -11,11 +12,24 @@ public class ComplaintStatsResponse {
     public ComplaintStatsResponse() {}
 
     public ComplaintStatsResponse(long total, long pending, long inProgress, long resolved, long rejected) {
+        this(total, pending, inProgress, resolved, rejected, 0);
+    }
+
+    public ComplaintStatsResponse(long total, long pending, long inProgress, long resolved, long rejected, long assigned) {
         this.total = total;
         this.pending = pending;
         this.inProgress = inProgress;
         this.resolved = resolved;
         this.rejected = rejected;
+        this.assigned = assigned;
+    }
+
+    public long getAssigned() {
+        return assigned;
+    }
+
+    public void setAssigned(long assigned) {
+        this.assigned = assigned;
     }
 
     public long getTotal() {

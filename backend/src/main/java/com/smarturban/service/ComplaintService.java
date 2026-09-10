@@ -1,13 +1,10 @@
 package com.smarturban.service;
 
-import com.smarturban.dto.ComplaintRequest;
-import com.smarturban.dto.ComplaintResponse;
-import com.smarturban.dto.ComplaintStatsResponse;
-import com.smarturban.entity.Complaint;
-import com.smarturban.entity.ComplaintStatus;
-import com.smarturban.entity.Role;
-import com.smarturban.entity.User;
+import com.smarturban.dto.*;
+import com.smarturban.entity.*;
 import com.smarturban.repository.ComplaintRepository;
+import com.smarturban.repository.ComplaintStatusHistoryRepository;
+import com.smarturban.repository.DepartmentRepository;
 import com.smarturban.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,11 +23,19 @@ public class ComplaintService {
     private final ComplaintRepository complaintRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final DepartmentRepository departmentRepository;
+    private final ComplaintStatusHistoryRepository statusHistoryRepository;
 
-    public ComplaintService(ComplaintRepository complaintRepository, UserRepository userRepository, FileStorageService fileStorageService) {
+    public ComplaintService(ComplaintRepository complaintRepository,
+                            UserRepository userRepository,
+                            FileStorageService fileStorageService,
+                            DepartmentRepository departmentRepository,
+                            ComplaintStatusHistoryRepository statusHistoryRepository) {
         this.complaintRepository = complaintRepository;
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
+        this.departmentRepository = departmentRepository;
+        this.statusHistoryRepository = statusHistoryRepository;
     }
 
     public ComplaintResponse createComplaint(String email, ComplaintRequest request, MultipartFile image) {
@@ -59,7 +64,21 @@ public class ComplaintService {
         );
 
         Complaint saved = complaintRepository.save(complaint);
-        return ComplaintResponse.fromEntity(saved);
+
+        // Record initial status history entry
+        ComplaintStatusHistory initialHistory = new ComplaintStatusHistory(
+                saved,
+                null,
+                ComplaintStatus.PENDING,
+                user.getFullName() + " (" + user.getEmail() + ")",
+                "Complaint submitted by citizen"
+        );
+        statusHistoryRepository.save(initialHistory);
+
+        List<ComplaintStatusHistoryResponse> historyDtos = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(saved)
+                .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+
+        return ComplaintResponse.fromEntity(saved, historyDtos);
     }
 
     public List<ComplaintResponse> getMyComplaints(String email) {
@@ -68,7 +87,11 @@ public class ComplaintService {
 
         return complaintRepository.findByUserOrderByCreatedAtDesc(user)
                 .stream()
-                .map(ComplaintResponse::fromEntity)
+                .map(c -> {
+                    List<ComplaintStatusHistoryResponse> history = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(c)
+                            .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+                    return ComplaintResponse.fromEntity(c, history);
+                })
                 .toList();
     }
 
@@ -79,35 +102,111 @@ public class ComplaintService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-        // Normal users can only view their own complaints
+        // Normal users can only view their own complaints, ADMIN can view any
         if (!complaint.getUser().getId().equals(user.getId()) && user.getRole() != Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied to this complaint");
         }
 
-        return ComplaintResponse.fromEntity(complaint);
+        List<ComplaintStatusHistoryResponse> history = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(complaint)
+                .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+
+        return ComplaintResponse.fromEntity(complaint, history);
     }
 
-    public List<ComplaintResponse> getAllComplaints() {
-        return complaintRepository.findAllByOrderByCreatedAtDesc()
-                .stream()
-                .map(ComplaintResponse::fromEntity)
-                .toList();
+    public List<ComplaintResponse> getAllComplaintsForAdmin(ComplaintStatus statusFilter) {
+        List<Complaint> complaints;
+        if (statusFilter != null) {
+            complaints = complaintRepository.findAllByOrderByCreatedAtDesc()
+                    .stream().filter(c -> c.getStatus() == statusFilter).toList();
+        } else {
+            complaints = complaintRepository.findAllByOrderByCreatedAtDesc();
+        }
+
+        return complaints.stream().map(c -> {
+            List<ComplaintStatusHistoryResponse> history = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(c)
+                    .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+            return ComplaintResponse.fromEntity(c, history);
+        }).toList();
     }
 
-    public ComplaintResponse updateComplaintStatus(Long id, String email, ComplaintStatus status) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    public ComplaintResponse updateComplaintStatusByAdmin(Long id, String adminEmail, ComplaintStatus newStatus, String remarks) {
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admin user not found"));
 
-        if (user.getRole() != Role.ADMIN) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Normal users are not authorized to update complaint statuses");
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Normal users are not authorized to update complaint status");
         }
 
         Complaint complaint = complaintRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Complaint not found with id: " + id));
 
-        complaint.setStatus(status);
-        Complaint updated = complaintRepository.save(complaint);
-        return ComplaintResponse.fromEntity(updated);
+        ComplaintStatus oldStatus = complaint.getStatus();
+        complaint.setStatus(newStatus);
+        Complaint saved = complaintRepository.save(complaint);
+
+        String remarkText = (remarks != null && !remarks.trim().isEmpty()) ? remarks : "Status updated to " + newStatus;
+        ComplaintStatusHistory historyEntry = new ComplaintStatusHistory(
+                saved,
+                oldStatus,
+                newStatus,
+                admin.getFullName() + " [ADMIN]",
+                remarkText
+        );
+        statusHistoryRepository.save(historyEntry);
+
+        List<ComplaintStatusHistoryResponse> historyList = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(saved)
+                .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+
+        return ComplaintResponse.fromEntity(saved, historyList);
+    }
+
+    public ComplaintResponse assignDepartmentByAdmin(Long id, String adminEmail, Long departmentId, String remarks) {
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admin user not found"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Normal users are not authorized to assign departments");
+        }
+
+        Complaint complaint = complaintRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Complaint not found with id: " + id));
+
+        Department department = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department not found with id: " + departmentId));
+
+        ComplaintStatus oldStatus = complaint.getStatus();
+        complaint.setDepartment(department);
+        if (complaint.getStatus() == ComplaintStatus.PENDING) {
+            complaint.setStatus(ComplaintStatus.ASSIGNED);
+        }
+        Complaint saved = complaintRepository.save(complaint);
+
+        String remarkText = "Assigned to " + department.getName() + (remarks != null && !remarks.trim().isEmpty() ? ". " + remarks : "");
+        ComplaintStatusHistory historyEntry = new ComplaintStatusHistory(
+                saved,
+                oldStatus,
+                saved.getStatus(),
+                admin.getFullName() + " [ADMIN]",
+                remarkText
+        );
+        statusHistoryRepository.save(historyEntry);
+
+        List<ComplaintStatusHistoryResponse> historyList = statusHistoryRepository.findByComplaintOrderByCreatedAtAsc(saved)
+                .stream().map(ComplaintStatusHistoryResponse::fromEntity).toList();
+
+        return ComplaintResponse.fromEntity(saved, historyList);
+    }
+
+    public ComplaintStatsResponse getAdminComplaintStats() {
+        List<Complaint> all = complaintRepository.findAll();
+        long total = all.size();
+        long pending = all.stream().filter(c -> c.getStatus() == ComplaintStatus.PENDING).count();
+        long assigned = all.stream().filter(c -> c.getStatus() == ComplaintStatus.ASSIGNED).count();
+        long inProgress = all.stream().filter(c -> c.getStatus() == ComplaintStatus.IN_PROGRESS).count();
+        long resolved = all.stream().filter(c -> c.getStatus() == ComplaintStatus.RESOLVED).count();
+        long rejected = all.stream().filter(c -> c.getStatus() == ComplaintStatus.REJECTED).count();
+
+        return new ComplaintStatsResponse(total, pending, inProgress, resolved, rejected, assigned);
     }
 
     public ComplaintStatsResponse getMyComplaintStats(String email) {
@@ -116,11 +215,17 @@ public class ComplaintService {
 
         long total = complaintRepository.countByUser(user);
         long pending = complaintRepository.countByUserAndStatus(user, ComplaintStatus.PENDING);
+        long assigned = complaintRepository.countByUserAndStatus(user, ComplaintStatus.ASSIGNED);
         long inProgress = complaintRepository.countByUserAndStatus(user, ComplaintStatus.IN_PROGRESS);
         long resolved = complaintRepository.countByUserAndStatus(user, ComplaintStatus.RESOLVED);
         long rejected = complaintRepository.countByUserAndStatus(user, ComplaintStatus.REJECTED);
 
-        return new ComplaintStatsResponse(total, pending, inProgress, resolved, rejected);
+        return new ComplaintStatsResponse(total, pending, inProgress, resolved, rejected, assigned);
+    }
+
+    public List<DepartmentResponse> getAllActiveDepartments() {
+        return departmentRepository.findByActiveTrueOrderByNameAsc()
+                .stream().map(DepartmentResponse::fromEntity).toList();
     }
 
     private synchronized String generateComplaintNumber() {
