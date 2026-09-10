@@ -116,8 +116,7 @@ public class ComplaintService {
     public List<ComplaintResponse> getAllComplaintsForAdmin(ComplaintStatus statusFilter) {
         List<Complaint> complaints;
         if (statusFilter != null) {
-            complaints = complaintRepository.findAllByOrderByCreatedAtDesc()
-                    .stream().filter(c -> c.getStatus() == statusFilter).toList();
+            complaints = complaintRepository.findAllByStatusOrderByCreatedAtDesc(statusFilter);
         } else {
             complaints = complaintRepository.findAllByOrderByCreatedAtDesc();
         }
@@ -189,9 +188,11 @@ public class ComplaintService {
             return ComplaintResponse.fromEntity(complaint, historyList);
         }
 
-        ComplaintStatus oldStatus = complaint.getStatus();
+        ComplaintStatus currentStatus = complaint.getStatus();
         complaint.setDepartment(department);
-        if (complaint.getStatus() == ComplaintStatus.PENDING) {
+
+        // If the complaint is PENDING, transition status to ASSIGNED as part of assignment
+        if (currentStatus == ComplaintStatus.PENDING) {
             complaint.setStatus(ComplaintStatus.ASSIGNED);
         }
         Complaint saved = complaintRepository.save(complaint);
@@ -199,7 +200,7 @@ public class ComplaintService {
         String remarkText = "Assigned to " + department.getName() + (remarks != null && !remarks.trim().isEmpty() ? ". " + remarks : "");
         ComplaintStatusHistory historyEntry = new ComplaintStatusHistory(
                 saved,
-                oldStatus,
+                currentStatus,
                 saved.getStatus(),
                 admin.getFullName() + " [ADMIN]",
                 remarkText

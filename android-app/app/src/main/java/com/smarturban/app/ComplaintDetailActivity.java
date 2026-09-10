@@ -228,18 +228,7 @@ public class ComplaintDetailActivity extends AppCompatActivity {
     }
 
     private void setupAdminSpinnersAndButtons() {
-        // Status Spinner Options
-        List<String> statuses = Arrays.asList("PENDING", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "REJECTED");
-        ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, statuses);
-        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinnerUpdateStatus.setAdapter(statusAdapter);
-
-        if (currentComplaint != null && currentComplaint.getStatus() != null) {
-            int pos = statuses.indexOf(currentComplaint.getStatus());
-            if (pos >= 0) spinnerUpdateStatus.setSelection(pos);
-        }
-
-        // Fetch Departments for assignment
+        fetchStatusesAndSetupSpinner();
         fetchDepartments();
 
         btnAssignDept.setOnClickListener(v -> {
@@ -257,6 +246,37 @@ public class ComplaintDetailActivity extends AppCompatActivity {
             String selectedStatus = (String) spinnerUpdateStatus.getSelectedItem();
             String remarks = etStatusRemarks.getText().toString().trim();
             updateStatus(selectedStatus, remarks);
+        });
+    }
+
+    private void fetchStatusesAndSetupSpinner() {
+        List<String> statuses = new ArrayList<>();
+        ArrayAdapter<String> statusAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, statuses);
+        statusAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerUpdateStatus.setAdapter(statusAdapter);
+
+        RetrofitClient.getInstance(this).getApi().getStatuses().enqueue(new Callback<ApiResponse<List<String>>>() {
+            @Override
+            public void onResponse(Call<ApiResponse<List<String>>> call, Response<ApiResponse<List<String>>> response) {
+                statuses.clear();
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess() && response.body().getData() != null) {
+                    statuses.addAll(response.body().getData());
+                } else {
+                    statuses.addAll(Arrays.asList("PENDING", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "REJECTED"));
+                }
+                statusAdapter.notifyDataSetChanged();
+                if (currentComplaint != null && currentComplaint.getStatus() != null) {
+                    int pos = statuses.indexOf(currentComplaint.getStatus());
+                    if (pos >= 0) spinnerUpdateStatus.setSelection(pos);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponse<List<String>>> call, Throwable t) {
+                statuses.clear();
+                statuses.addAll(Arrays.asList("PENDING", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "REJECTED"));
+                statusAdapter.notifyDataSetChanged();
+            }
         });
     }
 

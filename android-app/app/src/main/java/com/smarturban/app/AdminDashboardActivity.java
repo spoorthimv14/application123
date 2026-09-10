@@ -75,7 +75,9 @@ public class AdminDashboardActivity extends AppCompatActivity {
     }
 
     private void setupFilterSpinner() {
-        List<String> filters = Arrays.asList("All Statuses", "PENDING", "ASSIGNED", "IN_PROGRESS", "RESOLVED", "REJECTED");
+        List<String> filters = new ArrayList<>();
+        filters.add("All Statuses");
+
         ArrayAdapter<String> filterAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, filters);
         filterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerStatusFilter.setAdapter(filterAdapter);
@@ -94,6 +96,23 @@ public class AdminDashboardActivity extends AppCompatActivity {
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 fetchAdminComplaints(null);
+            }
+        });
+
+        RetrofitClient.getInstance(this).getApi().getStatuses().enqueue(new Callback<ApiResponse<List<String>>>() {
+            @Override
+            public void onResponse(Call<ApiResponse<List<String>>> call, Response<ApiResponse<List<String>>> response) {
+                if (response.isSuccessful() && response.body() != null && response.body().isSuccess() && response.body().getData() != null) {
+                    filters.clear();
+                    filters.add("All Statuses");
+                    filters.addAll(response.body().getData());
+                    filterAdapter.notifyDataSetChanged();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ApiResponse<List<String>>> call, Throwable t) {
+                // Keep default option
             }
         });
     }

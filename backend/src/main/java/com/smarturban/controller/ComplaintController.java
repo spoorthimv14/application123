@@ -44,14 +44,13 @@ public class ComplaintController {
                 .map(com.smarturban.entity.Category::getName)
                 .toList();
 
-        if (categories.isEmpty()) {
-            categories = Arrays.asList(
-                    "Road/Pothole", "Garbage/Waste", "Street Light", "Water Supply",
-                    "Drainage", "Traffic", "Public Toilet", "Park", "Electricity", "Other"
-            );
-        }
-
         return ResponseEntity.ok(ApiResponse.success("Categories retrieved successfully", categories));
+    }
+
+    @GetMapping("/statuses")
+    public ResponseEntity<ApiResponse<List<ComplaintStatus>>> getStatuses() {
+        List<ComplaintStatus> statuses = Arrays.asList(ComplaintStatus.values());
+        return ResponseEntity.ok(ApiResponse.success("Complaint statuses retrieved successfully", statuses));
     }
 
     @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })

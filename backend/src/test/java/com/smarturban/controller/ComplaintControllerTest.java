@@ -178,4 +178,13 @@ public class ComplaintControllerTest {
         mockMvc.perform(get("/api/complaints/my"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void testGetStatusesEndpoint() throws Exception {
+        mockMvc.perform(get("/api/complaints/statuses")
+                .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.length()").value(5));
+    }
 }

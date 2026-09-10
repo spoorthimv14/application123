@@ -22,6 +22,9 @@ public interface ApiService {
     @GET("api/complaints/categories")
     Call<ApiResponse<List<String>>> getCategories();
 
+    @GET("api/complaints/statuses")
+    Call<ApiResponse<List<String>>> getStatuses();
+
     @GET("api/departments")
     Call<ApiResponse<List<Department>>> getDepartments();
 
