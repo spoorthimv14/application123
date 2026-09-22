@@ -89,4 +89,16 @@ public class AuthAndUserTest {
                 .andExpect(jsonPath("$.data.email").value("citizen@smarturban.com"))
                 .andExpect(jsonPath("$.data.fullName").value("Test Citizen"));
     }
+
+    @Test
+    void testAdminLogin() throws Exception {
+        LoginRequest loginReq = new LoginRequest("admin@smarturban.com", "Admin@12345");
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.token").exists())
+                .andExpect(jsonPath("$.data.role").value("ADMIN"));
+    }
 }

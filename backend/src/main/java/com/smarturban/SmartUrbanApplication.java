@@ -2,12 +2,17 @@ package com.smarturban;
 
 import com.smarturban.entity.Category;
 import com.smarturban.entity.Department;
+import com.smarturban.entity.Role;
+import com.smarturban.entity.User;
 import com.smarturban.repository.CategoryRepository;
 import com.smarturban.repository.DepartmentRepository;
+import com.smarturban.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Arrays;
 import java.util.List;
@@ -20,8 +25,18 @@ public class SmartUrbanApplication {
     }
 
     @Bean
-    public CommandLineRunner initDatabase(CategoryRepository categoryRepository, DepartmentRepository departmentRepository) {
+    public CommandLineRunner initDatabase(
+            CategoryRepository categoryRepository,
+            DepartmentRepository departmentRepository,
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            @Value("${admin.email:admin@smarturban.com}") String adminEmail,
+            @Value("${admin.password:Admin@12345}") String adminPassword,
+            @Value("${admin.full-name:System Administrator}") String adminFullName,
+            @Value("${admin.phone:+91 99999 99999}") String adminPhone
+    ) {
         return args -> {
+            // Seed Categories
             if (categoryRepository.count() == 0) {
                 List<Category> defaultCategories = Arrays.asList(
                         new Category("Road/Pothole", "Potholes, damaged roads, asphalt repair", true),
@@ -38,6 +53,7 @@ public class SmartUrbanApplication {
                 categoryRepository.saveAll(defaultCategories);
             }
 
+            // Seed Departments
             if (departmentRepository.count() == 0) {
                 List<Department> defaultDepartments = Arrays.asList(
                         new Department("Public Works Department", "PWD", true),
@@ -49,6 +65,19 @@ public class SmartUrbanApplication {
                         new Department("Parks & Horticulture", "PARK", true)
                 );
                 departmentRepository.saveAll(defaultDepartments);
+            }
+
+            // Seed Admin Account
+            if (userRepository.findByEmail(adminEmail).isEmpty()) {
+                User admin = new User(
+                        adminFullName,
+                        adminEmail,
+                        adminPhone,
+                        passwordEncoder.encode(adminPassword),
+                        Role.ADMIN,
+                        "SmartUrban Municipal HQ"
+                );
+                userRepository.save(admin);
             }
         };
     }

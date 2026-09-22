@@ -32,7 +32,8 @@ public class DashboardActivity extends AppCompatActivity {
     private TextView tvWelcomeUser;
     private TextView tvTotalCount, tvPendingCount, tvResolvedCount;
     private ImageButton btnLogout;
-    private MaterialButton btnReportAction;
+    private MaterialButton btnReportAction, btnOpenAdminDashboard;
+    private View cardAdminDashboardBanner;
     private BottomNavigationView bottomNavigation;
     private RecyclerView recyclerViewRecentComplaints;
     private View cardEmptyRecent;
@@ -79,10 +80,19 @@ public class DashboardActivity extends AppCompatActivity {
         tvResolvedCount = findViewById(R.id.tvResolvedCount);
         btnLogout = findViewById(R.id.btnLogout);
         btnReportAction = findViewById(R.id.btnReportAction);
+        cardAdminDashboardBanner = findViewById(R.id.cardAdminDashboardBanner);
+        btnOpenAdminDashboard = findViewById(R.id.btnOpenAdminDashboard);
         bottomNavigation = findViewById(R.id.bottomNavigation);
         recyclerViewRecentComplaints = findViewById(R.id.recyclerViewRecentComplaints);
         cardEmptyRecent = findViewById(R.id.cardEmptyRecent);
         progressBarRecent = findViewById(R.id.progressBarRecent);
+
+        if (btnOpenAdminDashboard != null) {
+            btnOpenAdminDashboard.setOnClickListener(v -> {
+                Intent intent = new Intent(DashboardActivity.this, AdminDashboardActivity.class);
+                startActivity(intent);
+            });
+        }
     }
 
     private void setupRecentRecyclerView() {
@@ -125,7 +135,15 @@ public class DashboardActivity extends AppCompatActivity {
         });
     }
 
+    private void checkAndDisplayAdminBanner() {
+        boolean isAdmin = "ADMIN".equalsIgnoreCase(tokenManager.getUserRole());
+        if (cardAdminDashboardBanner != null) {
+            cardAdminDashboardBanner.setVisibility(isAdmin ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private void fetchUserProfile() {
+        checkAndDisplayAdminBanner();
         RetrofitClient.getInstance(this).getApi().getCurrentUser().enqueue(new Callback<ApiResponse<AuthResponse>>() {
             @Override
             public void onResponse(Call<ApiResponse<AuthResponse>> call, Response<ApiResponse<AuthResponse>> response) {
@@ -139,6 +157,7 @@ public class DashboardActivity extends AppCompatActivity {
                         if (auth.getFullName() != null) {
                             tvWelcomeUser.setText("Hello, " + auth.getFullName() + " 👋");
                         }
+                        checkAndDisplayAdminBanner();
                     }
                 }
             }
