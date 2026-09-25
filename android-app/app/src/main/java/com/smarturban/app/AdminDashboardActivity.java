@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.card.MaterialCardView;
 import com.smarturban.app.api.RetrofitClient;
 import com.smarturban.app.model.ApiResponse;
 import com.smarturban.app.model.Complaint;
@@ -18,12 +19,12 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class AdminDashboardActivity extends AppCompatActivity {
 
     private ImageButton btnAdminBack;
+    private MaterialCardView cardUserManagement;
     private TextView tvAdminTotal, tvAdminPending, tvAdminAssigned, tvAdminInProgress, tvAdminResolved, tvAdminRejected;
     private Spinner spinnerStatusFilter;
     private ProgressBar progressBarAdmin;
@@ -41,6 +42,10 @@ public class AdminDashboardActivity extends AppCompatActivity {
         initViews();
 
         btnAdminBack.setOnClickListener(v -> finish());
+        cardUserManagement.setOnClickListener(v -> {
+            Intent intent = new Intent(AdminDashboardActivity.this, UserManagementActivity.class);
+            startActivity(intent);
+        });
 
         setupRecyclerView();
         setupFilterSpinner();
@@ -51,6 +56,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
     private void initViews() {
         btnAdminBack = findViewById(R.id.btnAdminBack);
+        cardUserManagement = findViewById(R.id.cardUserManagement);
         tvAdminTotal = findViewById(R.id.tvAdminTotal);
         tvAdminPending = findViewById(R.id.tvAdminPending);
         tvAdminAssigned = findViewById(R.id.tvAdminAssigned);
