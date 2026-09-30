@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_light"
+    android:orientation="vertical">
+
+    <!-- Header Bar -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:background="@color/primary_navy"
+        android:paddingHorizontal="16dp">
+
+        <ImageButton
+            android:id="@+id/btnBackUsers"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Back"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="@color/surface_white" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="User Management"
+            android:textColor="@color/surface_white"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnAddUserHeader"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Add User"
+            android:src="@android:drawable/ic_input_add"
+            app:tint="@color/surface_white" />
+    </RelativeLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Search Input -->
+        <EditText
+            android:id="@+id/etUserSearch"
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@android:drawable/editbox_background_normal"
+            android:hint="Search users by name, email, phone..."
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:paddingHorizontal="12dp"
+            android:textSize="14sp" />
+
+        <!-- Filter Spinners Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Spinner
+                android:id="@+id/spinnerRoleFilter"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@android:drawable/btn_dropdown" />
+
+            <Spinner
+                android:id="@+id/spinnerStatusUserFilter"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@android:drawable/btn_dropdown" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ProgressBar
+            android:id="@+id/progressBarUsers"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tvUsersEmpty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="No users found matching filter criteria."
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewUsers"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="16dp" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabAddUser"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:contentDescription="Add New User"
+            android:src="@android:drawable/ic_input_add"
+            app:backgroundTint="@color/primary_navy"
+            app:tint="@color/surface_white" />
+    </FrameLayout>
+</LinearLayout>

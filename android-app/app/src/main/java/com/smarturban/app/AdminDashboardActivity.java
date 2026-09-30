@@ -24,6 +24,7 @@ import java.util.List;
 public class AdminDashboardActivity extends AppCompatActivity {
 
     private ImageButton btnAdminBack;
+    private View cardUserManagement;
     private TextView tvAdminTotal, tvAdminPending, tvAdminAssigned, tvAdminInProgress, tvAdminResolved, tvAdminRejected;
     private Spinner spinnerStatusFilter;
     private ProgressBar progressBarAdmin;
@@ -41,6 +42,10 @@ public class AdminDashboardActivity extends AppCompatActivity {
         initViews();
 
         btnAdminBack.setOnClickListener(v -> finish());
+        cardUserManagement.setOnClickListener(v -> {
+            Intent intent = new Intent(AdminDashboardActivity.this, UserListActivity.class);
+            startActivity(intent);
+        });
 
         setupRecyclerView();
         setupFilterSpinner();
@@ -51,6 +56,7 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
     private void initViews() {
         btnAdminBack = findViewById(R.id.btnAdminBack);
+        cardUserManagement = findViewById(R.id.cardUserManagement);
         tvAdminTotal = findViewById(R.id.tvAdminTotal);
         tvAdminPending = findViewById(R.id.tvAdminPending);
         tvAdminAssigned = findViewById(R.id.tvAdminAssigned);

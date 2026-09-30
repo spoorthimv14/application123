@@ -62,4 +62,36 @@ public interface ApiService {
             @Path("id") Long id,
             @Body AssignDepartmentRequest request
     );
+
+    // Admin User Management Endpoints
+    @GET("api/admin/users")
+    Call<ApiResponse<List<User>>> getAdminUsers(
+            @Query("search") String search,
+            @Query("role") String role,
+            @Query("enabled") Boolean enabled
+    );
+
+    @GET("api/admin/users/{id}")
+    Call<ApiResponse<User>> getAdminUserById(@Path("id") Long id);
+
+    @POST("api/admin/users")
+    Call<ApiResponse<User>> createAdminUser(@Body CreateUserRequest request);
+
+    @PUT("api/admin/users/{id}")
+    Call<ApiResponse<User>> updateAdminUser(
+            @Path("id") Long id,
+            @Body UpdateUserRequest request
+    );
+
+    @PUT("api/admin/users/{id}/status")
+    Call<ApiResponse<User>> updateAdminUserStatus(
+            @Path("id") Long id,
+            @Body UserStatusRequest request
+    );
+
+    @PUT("api/admin/users/{id}/password")
+    Call<ApiResponse<User>> changeAdminUserPassword(
+            @Path("id") Long id,
+            @Body AdminChangePasswordRequest request
+    );
 }
