@@ -74,8 +74,8 @@ public class SmartUrbanApplication {
                         adminEmail,
                         adminPhone,
                         passwordEncoder.encode(adminPassword),
-                        Role.ADMIN,
-                        "SmartUrban Municipal HQ"
+                        "SmartUrban Municipal HQ",
+                        Role.ADMIN
                 );
                 userRepository.save(admin);
             }
