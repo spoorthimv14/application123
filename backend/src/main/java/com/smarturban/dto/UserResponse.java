@@ -1,5 +1,7 @@
 package com.smarturban.dto;
 
+import java.time.LocalDateTime;
+
 public class UserResponse {
 
     private Long userId;
@@ -8,6 +10,9 @@ public class UserResponse {
     private String phone;
     private String role;
     private String address;
+    private boolean enabled;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
     public UserResponse() {
     }
@@ -19,6 +24,19 @@ public class UserResponse {
         this.phone = phone;
         this.role = role;
         this.address = address;
+        this.enabled = true;
+    }
+
+    public UserResponse(Long userId, String fullName, String email, String phone, String role, String address, boolean enabled, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.userId = userId;
+        this.fullName = fullName;
+        this.email = email;
+        this.phone = phone;
+        this.role = role;
+        this.address = address;
+        this.enabled = enabled;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     public Long getUserId() {
@@ -67,5 +85,29 @@ public class UserResponse {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

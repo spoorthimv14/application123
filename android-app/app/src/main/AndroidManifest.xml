@@ -54,6 +54,18 @@
             android:name=".AdminDashboardActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".AdminUserListActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".AdminAddUserActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".AdminUserDetailActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>
