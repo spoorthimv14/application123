@@ -52,6 +52,25 @@ public class User {
         this.enabled = true;
     }
 
+    public User(String fullName, String email, String phone, String password, Role role, String address) {
+        this.fullName = fullName;
+        this.email = email;
+        this.phone = phone;
+        this.password = password;
+        this.role = role;
+        this.address = address;
+        this.enabled = true;
+    }
+
+    public User(String fullName, String email, String phone, String password, Role role) {
+        this.fullName = fullName;
+        this.email = email;
+        this.phone = phone;
+        this.password = password;
+        this.role = role;
+        this.enabled = true;
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
