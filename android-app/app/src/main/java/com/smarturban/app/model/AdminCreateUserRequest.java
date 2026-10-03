@@ -2,10 +2,7 @@ package com.smarturban.app.model;
 
 import com.google.gson.annotations.SerializedName;
 
-public class UserResponse {
-    @SerializedName("userId")
-    private Long userId;
-
+public class AdminCreateUserRequest {
     @SerializedName("fullName")
     private String fullName;
 
@@ -15,20 +12,28 @@ public class UserResponse {
     @SerializedName("phone")
     private String phone;
 
+    @SerializedName("password")
+    private String password;
+
     @SerializedName("role")
     private String role;
 
     @SerializedName("address")
     private String address;
 
-    @SerializedName("enabled")
-    private boolean enabled;
+    public AdminCreateUserRequest(String fullName, String email, String phone, String password, String role, String address) {
+        this.fullName = fullName;
+        this.email = email;
+        this.phone = phone;
+        this.password = password;
+        this.role = role;
+        this.address = address;
+    }
 
-    public Long getUserId() { return userId; }
     public String getFullName() { return fullName; }
     public String getEmail() { return email; }
     public String getPhone() { return phone; }
+    public String getPassword() { return password; }
     public String getRole() { return role; }
     public String getAddress() { return address; }
-    public boolean isEnabled() { return enabled; }
 }

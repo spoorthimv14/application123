@@ -42,6 +42,14 @@ public class AdminDashboardActivity extends AppCompatActivity {
 
         btnAdminBack.setOnClickListener(v -> finish());
 
+        View cardManageUsers = findViewById(R.id.cardManageUsers);
+        if (cardManageUsers != null) {
+            cardManageUsers.setOnClickListener(v -> {
+                Intent intent = new Intent(AdminDashboardActivity.this, UserListActivity.class);
+                startActivity(intent);
+            });
+        }
+
         setupRecyclerView();
         setupFilterSpinner();
 

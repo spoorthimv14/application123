@@ -8,17 +8,19 @@ public class UserResponse {
     private String phone;
     private String role;
     private String address;
+    private boolean enabled;
 
     public UserResponse() {
     }
 
-    public UserResponse(Long userId, String fullName, String email, String phone, String role, String address) {
+    public UserResponse(Long userId, String fullName, String email, String phone, String role, String address, boolean enabled) {
         this.userId = userId;
         this.fullName = fullName;
         this.email = email;
         this.phone = phone;
         this.role = role;
         this.address = address;
+        this.enabled = enabled;
     }
 
     public Long getUserId() {
@@ -67,5 +69,13 @@ public class UserResponse {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 }
