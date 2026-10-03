@@ -56,7 +56,8 @@ public class AuthService {
                 savedUser.getEmail(),
                 savedUser.getPhone(),
                 savedUser.getRole().name(),
-                savedUser.getAddress()
+                savedUser.getAddress(),
+                savedUser.isEnabled()
         );
     }
 
