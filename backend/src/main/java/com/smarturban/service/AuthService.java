@@ -11,6 +11,7 @@ import com.smarturban.repository.UserRepository;
 import com.smarturban.security.JwtService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -65,6 +66,8 @@ public class AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
+        } catch (DisabledException e) {
+            throw new BadCredentialsException("Account is deactivated. Please contact administrator.");
         } catch (BadCredentialsException e) {
             throw new BadCredentialsException("Invalid email or password");
         }

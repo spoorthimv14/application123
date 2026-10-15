@@ -44,7 +44,7 @@ public interface ApiService {
     @GET("api/complaints/{id}")
     Call<ApiResponse<Complaint>> getComplaintById(@Path("id") Long id);
 
-    // Admin Endpoints
+    // Admin Complaint Endpoints
     @GET("api/admin/complaints")
     Call<ApiResponse<List<Complaint>>> getAdminComplaints(@Query("status") String statusFilter);
 
@@ -61,5 +61,37 @@ public interface ApiService {
     Call<ApiResponse<Complaint>> assignDepartment(
             @Path("id") Long id,
             @Body AssignDepartmentRequest request
+    );
+
+    // Admin User Management Endpoints
+    @GET("api/admin/users")
+    Call<ApiResponse<List<UserAdminResponse>>> getUsers(
+            @Query("search") String search,
+            @Query("role") String role,
+            @Query("active") Boolean active
+    );
+
+    @GET("api/admin/users/{id}")
+    Call<ApiResponse<UserAdminResponse>> getUserById(@Path("id") Long id);
+
+    @POST("api/admin/users")
+    Call<ApiResponse<UserAdminResponse>> createUser(@Body UserCreateRequest request);
+
+    @PUT("api/admin/users/{id}")
+    Call<ApiResponse<UserAdminResponse>> updateUser(
+            @Path("id") Long id,
+            @Body UserUpdateRequest request
+    );
+
+    @PUT("api/admin/users/{id}/status")
+    Call<ApiResponse<UserAdminResponse>> updateUserStatus(
+            @Path("id") Long id,
+            @Body UserStatusUpdateRequest request
+    );
+
+    @PUT("api/admin/users/{id}/password")
+    Call<ApiResponse<UserAdminResponse>> resetUserPassword(
+            @Path("id") Long id,
+            @Body UserPasswordResetRequest request
     );
 }
