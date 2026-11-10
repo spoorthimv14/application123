@@ -49,6 +49,15 @@ public class Complaint {
     @SerializedName("statusHistory")
     private java.util.List<ComplaintStatusHistory> statusHistory;
 
+    @SerializedName("completionRemarks")
+    private String completionRemarks;
+
+    @SerializedName("resolutionDate")
+    private String resolutionDate;
+
+    @SerializedName("completionPhotos")
+    private java.util.List<CompletionPhoto> completionPhotos;
+
     @SerializedName("createdAt")
     private String createdAt;
 
@@ -175,6 +184,30 @@ public class Complaint {
 
     public void setStatusHistory(java.util.List<ComplaintStatusHistory> statusHistory) {
         this.statusHistory = statusHistory;
+    }
+
+    public String getCompletionRemarks() {
+        return completionRemarks;
+    }
+
+    public void setCompletionRemarks(String completionRemarks) {
+        this.completionRemarks = completionRemarks;
+    }
+
+    public String getResolutionDate() {
+        return resolutionDate;
+    }
+
+    public void setResolutionDate(String resolutionDate) {
+        this.resolutionDate = resolutionDate;
+    }
+
+    public java.util.List<CompletionPhoto> getCompletionPhotos() {
+        return completionPhotos;
+    }
+
+    public void setCompletionPhotos(java.util.List<CompletionPhoto> completionPhotos) {
+        this.completionPhotos = completionPhotos;
     }
 
     public String getCreatedAt() {

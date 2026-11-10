@@ -17,7 +17,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+
 @SpringBootApplication
+@ComponentScan(
+        basePackages = "com.smarturban",
+        excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX, pattern = "com\\.smarturban\\.backend\\..*")
+)
+@EntityScan(basePackages = "com.smarturban.entity")
+@EnableJpaRepositories(basePackages = "com.smarturban.repository")
 public class SmartUrbanApplication {
 
     public static void main(String[] args) {
@@ -74,8 +86,8 @@ public class SmartUrbanApplication {
                         adminEmail,
                         adminPhone,
                         passwordEncoder.encode(adminPassword),
-                        Role.ADMIN,
-                        "SmartUrban Municipal HQ"
+                        "SmartUrban Municipal HQ",
+                        Role.ADMIN
                 );
                 userRepository.save(admin);
             }

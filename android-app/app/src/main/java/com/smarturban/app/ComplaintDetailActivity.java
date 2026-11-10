@@ -42,6 +42,12 @@ public class ComplaintDetailActivity extends AppCompatActivity {
     private MapView detailMapView;
     private RecyclerView recyclerViewStatusHistory;
 
+    // Work Completion Section Views
+    private MaterialCardView cardCompletionDetails;
+    private TextView tvResolutionDate, tvCompletionRemarks, tvNoCompletionPhoto;
+    private HorizontalScrollView scrollCompletionPhotos;
+    private LinearLayout containerCompletionPhotos;
+
     // Admin Controls
     private MaterialCardView cardAdminControls;
     private Spinner spinnerDepartments, spinnerUpdateStatus;
@@ -97,6 +103,13 @@ public class ComplaintDetailActivity extends AppCompatActivity {
         imgDetailPhoto = findViewById(R.id.imgDetailPhoto);
         detailMapView = findViewById(R.id.detailMapView);
         recyclerViewStatusHistory = findViewById(R.id.recyclerViewStatusHistory);
+
+        cardCompletionDetails = findViewById(R.id.cardCompletionDetails);
+        tvResolutionDate = findViewById(R.id.tvResolutionDate);
+        tvCompletionRemarks = findViewById(R.id.tvCompletionRemarks);
+        tvNoCompletionPhoto = findViewById(R.id.tvNoCompletionPhoto);
+        scrollCompletionPhotos = findViewById(R.id.scrollCompletionPhotos);
+        containerCompletionPhotos = findViewById(R.id.containerCompletionPhotos);
 
         cardAdminControls = findViewById(R.id.cardAdminControls);
         spinnerDepartments = findViewById(R.id.spinnerDepartments);
@@ -212,7 +225,110 @@ public class ComplaintDetailActivity extends AppCompatActivity {
         String createdAtStr = currentComplaint.getCreatedAt() != null ? currentComplaint.getCreatedAt().replace("T", " ") : "";
         tvDetailTimestamps.setText("Submitted on: " + createdAtStr);
 
+        bindCompletionDetails();
+
         setupAdminControlsIfAuthorized();
+    }
+
+    private void bindCompletionDetails() {
+        if (currentComplaint == null) return;
+
+        boolean isResolved = "RESOLVED".equalsIgnoreCase(currentComplaint.getStatus()) ||
+                "Resolved".equalsIgnoreCase(currentComplaint.getStatus());
+        boolean hasCompletionData = currentComplaint.getResolutionDate() != null ||
+                (currentComplaint.getCompletionRemarks() != null && !currentComplaint.getCompletionRemarks().trim().isEmpty()) ||
+                (currentComplaint.getCompletionPhotos() != null && !currentComplaint.getCompletionPhotos().isEmpty());
+
+        if (isResolved || hasCompletionData) {
+            cardCompletionDetails.setVisibility(View.VISIBLE);
+
+            // 1. Resolution Date
+            if (currentComplaint.getResolutionDate() != null && !currentComplaint.getResolutionDate().isEmpty()) {
+                tvResolutionDate.setVisibility(View.VISIBLE);
+                String resDateStr = currentComplaint.getResolutionDate().replace("T", " ");
+                if (resDateStr.length() > 16) resDateStr = resDateStr.substring(0, 16);
+                tvResolutionDate.setText(getString(R.string.resolution_date_fmt, resDateStr));
+            } else {
+                tvResolutionDate.setVisibility(View.GONE);
+            }
+
+            // 2. Completion Remarks
+            if (currentComplaint.getCompletionRemarks() != null && !currentComplaint.getCompletionRemarks().trim().isEmpty()) {
+                tvCompletionRemarks.setVisibility(View.VISIBLE);
+                tvCompletionRemarks.setText(getString(R.string.completion_remarks_fmt, currentComplaint.getCompletionRemarks().trim()));
+            } else {
+                tvCompletionRemarks.setVisibility(View.GONE);
+            }
+
+            // 3. Completion Photos
+            List<CompletionPhoto> photos = currentComplaint.getCompletionPhotos();
+            containerCompletionPhotos.removeAllViews();
+
+            if (photos != null && !photos.isEmpty()) {
+                tvNoCompletionPhoto.setVisibility(View.GONE);
+                scrollCompletionPhotos.setVisibility(View.VISIBLE);
+
+                int photoWidthPx = (int) (140 * getResources().getDisplayMetrics().density);
+                int photoHeightPx = (int) (140 * getResources().getDisplayMetrics().density);
+                int marginPx = (int) (8 * getResources().getDisplayMetrics().density);
+
+                for (CompletionPhoto photo : photos) {
+                    LinearLayout itemLayout = new LinearLayout(this);
+                    itemLayout.setOrientation(LinearLayout.VERTICAL);
+                    LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(photoWidthPx, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    itemParams.setMargins(0, 0, marginPx, 0);
+                    itemLayout.setLayoutParams(itemParams);
+
+                    ImageView iv = new ImageView(this);
+                    LinearLayout.LayoutParams ivParams = new LinearLayout.LayoutParams(photoWidthPx, photoHeightPx);
+                    iv.setLayoutParams(ivParams);
+                    iv.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    iv.setBackgroundColor(Color.parseColor("#E2E8F0"));
+
+                    String photoUrl = photo.getPhotoUrl();
+                    String fullPhotoUrl = photoUrl.startsWith("http") ? photoUrl :
+                            RetrofitClient.getBaseUrl() + (photoUrl.startsWith("/") ? photoUrl.substring(1) : photoUrl);
+
+                    Glide.with(this)
+                            .load(fullPhotoUrl)
+                            .centerCrop()
+                            .placeholder(R.drawable.smarturban_logo)
+                            .error(R.drawable.smarturban_logo)
+                            .into(iv);
+
+                    itemLayout.addView(iv);
+
+                    if (photo.getUploadedBy() != null && !photo.getUploadedBy().isEmpty()) {
+                        TextView tvBy = new TextView(this);
+                        tvBy.setText(getString(R.string.photo_by_fmt, photo.getUploadedBy()));
+                        tvBy.setTextSize(11f);
+                        tvBy.setTextColor(Color.parseColor("#065F46"));
+                        tvBy.setMaxLines(1);
+                        tvBy.setPadding(0, 4, 0, 0);
+                        itemLayout.addView(tvBy);
+                    }
+
+                    if (photo.getUploadedAt() != null && !photo.getUploadedAt().isEmpty()) {
+                        String dateStr = photo.getUploadedAt().replace("T", " ");
+                        if (dateStr.length() > 16) dateStr = dateStr.substring(0, 16);
+                        TextView tvDate = new TextView(this);
+                        tvDate.setText(dateStr);
+                        tvDate.setTextSize(10f);
+                        tvDate.setTextColor(Color.parseColor("#64748B"));
+                        tvDate.setMaxLines(1);
+                        itemLayout.addView(tvDate);
+                    }
+
+                    containerCompletionPhotos.addView(itemLayout);
+                }
+            } else {
+                scrollCompletionPhotos.setVisibility(View.GONE);
+                tvNoCompletionPhoto.setVisibility(View.VISIBLE);
+                tvNoCompletionPhoto.setText(R.string.no_completion_photo);
+            }
+        } else {
+            cardCompletionDetails.setVisibility(View.GONE);
+        }
     }
 
     private void setupAdminControlsIfAuthorized() {
