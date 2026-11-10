@@ -58,7 +58,6 @@ public class WebSecurityConfig {
                     auth.requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/categories/**").permitAll()
                         .requestMatchers("/api/departments/**").permitAll()
-                        .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/images/**").permitAll()
                         .requestMatchers("/css/**").permitAll()
                         .requestMatchers("/js/**").permitAll()
@@ -68,6 +67,7 @@ public class WebSecurityConfig {
                         .requestMatchers("/api/admin/**").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/citizen/**").hasAnyAuthority("ROLE_CITIZEN", "ROLE_ADMIN")
                         .requestMatchers("/api/users/**").hasAnyAuthority("ROLE_CITIZEN", "ROLE_ADMIN")
+                        .requestMatchers("/uploads/**").hasAnyAuthority("ROLE_CITIZEN", "ROLE_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form

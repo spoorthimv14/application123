@@ -296,6 +296,9 @@ public class ComplaintDetailActivity extends AppCompatActivity {
                             .error(R.drawable.smarturban_logo)
                             .into(iv);
 
+                    final String finalFullPhotoUrl = fullPhotoUrl;
+                    iv.setOnClickListener(v -> showFullImageDialog(finalFullPhotoUrl));
+
                     itemLayout.addView(iv);
 
                     if (photo.getUploadedBy() != null && !photo.getUploadedBy().isEmpty()) {
@@ -488,6 +491,26 @@ public class ComplaintDetailActivity extends AppCompatActivity {
             detailMapView.getController().setCenter(point);
             detailMapView.invalidate();
         }
+    }
+
+    private void showFullImageDialog(String imageUrl) {
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        ImageView fullImageView = new ImageView(this);
+        fullImageView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        fullImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        fullImageView.setBackgroundColor(Color.BLACK);
+        fullImageView.setOnClickListener(v -> dialog.dismiss());
+
+        Glide.with(this)
+                .load(imageUrl)
+                .fitCenter()
+                .placeholder(R.drawable.smarturban_logo)
+                .error(R.drawable.smarturban_logo)
+                .into(fullImageView);
+
+        dialog.setContentView(fullImageView);
+        dialog.show();
     }
 
     @Override

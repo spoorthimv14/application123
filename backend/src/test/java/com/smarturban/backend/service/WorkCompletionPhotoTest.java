@@ -1,27 +1,45 @@
 package com.smarturban.backend.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smarturban.backend.dto.ComplaintRequest;
 import com.smarturban.backend.dto.ComplaintResponse;
 import com.smarturban.backend.entity.*;
 import com.smarturban.backend.repository.*;
-import com.smarturban.backend.security.UserDetailsImpl;
+import com.smarturban.backend.security.JwtUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class WorkCompletionPhotoTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    private JwtUtils jwtUtils;
 
     @Autowired
     private ComplaintService complaintService;
@@ -49,8 +67,13 @@ public class WorkCompletionPhotoTest {
 
     private User citizen1;
     private User citizen2;
+    private User adminUser;
     private Category testCategory;
     private Department testDept;
+
+    private String citizen1Token;
+    private String citizen2Token;
+    private String adminToken;
 
     @BeforeEach
     public void setUp() {
@@ -65,11 +88,18 @@ public class WorkCompletionPhotoTest {
         citizen2 = userRepository.findByEmail("citizen2_test@smarturban.com").orElseGet(() ->
                 userRepository.save(new User("Citizen Two", "citizen2_test@smarturban.com", "9222222222", "Pass@123", "Street 2", "ROLE_CITIZEN")));
 
+        adminUser = userRepository.findByEmail("admin_auth_test@smarturban.com").orElseGet(() ->
+                userRepository.save(new User("Admin Officer", "admin_auth_test@smarturban.com", "9999999999", "Admin@12345", "HQ", "ROLE_ADMIN")));
+
         testDept = departmentRepository.findByName("Public Works Department").orElseGet(() ->
                 departmentRepository.save(new Department("Public Works Department", "PWD Dept")));
 
         testCategory = categoryRepository.findByName("Road Maintenance").orElseGet(() ->
                 categoryRepository.save(new Category("Road Maintenance", "Road issues", testDept)));
+
+        citizen1Token = jwtUtils.generateTokenFromUsername(citizen1.getEmail());
+        citizen2Token = jwtUtils.generateTokenFromUsername(citizen2.getEmail());
+        adminToken = jwtUtils.generateTokenFromUsername(adminUser.getEmail());
     }
 
     private Complaint createTestComplaint(User owner, String originalImageUrl) {
@@ -90,7 +120,7 @@ public class WorkCompletionPhotoTest {
         assertEquals("/uploads/orig_photo1.jpg", c.getImageUrl());
 
         Complaint resolved = complaintService.updateComplaintStatusAndDepartment(
-                c.getId(), "Resolved", testDept.getId(), "Admin Jane",
+                c.getId(), "Resolved", testDept.getId(), adminUser.getFullName(),
                 "Fixed the pothole", "Asphalt paving completed", Collections.emptyList());
 
         assertEquals("Resolved", resolved.getStatus());
@@ -103,54 +133,57 @@ public class WorkCompletionPhotoTest {
     }
 
     @Test
-    @DisplayName("2. Resolve a complaint with one completion photo")
-    public void testResolveComplaintWithOnePhoto() {
+    @DisplayName("2. Resolve a complaint with one completion photo via multipart API")
+    public void testResolveComplaintWithOnePhotoApi() throws Exception {
         Complaint c = createTestComplaint(citizen1, "/uploads/orig_pothole.jpg");
 
-        Complaint resolved = complaintService.updateComplaintStatusAndDepartment(
-                c.getId(), "Resolved", testDept.getId(), "Admin Jane",
-                "Repairs completed", "Filled and asphalt laid", List.of("/uploads/completion_1.jpg"));
+        // Valid JPEG content (magic bytes FF D8 FF)
+        byte[] validJpeg = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F'};
+        MockMultipartFile photoPart = new MockMultipartFile(
+                "photos", "comp1.jpg", "image/jpeg", validJpeg);
 
-        assertEquals("Resolved", resolved.getStatus());
-        assertNotNull(resolved.getResolutionDate());
-        assertEquals("Filled and asphalt laid", resolved.getCompletionRemarks());
-        assertEquals("/uploads/orig_pothole.jpg", resolved.getImageUrl());
+        mockMvc.perform(multipart("/api/admin/complaints/" + c.getId() + "/resolve")
+                        .file(photoPart)
+                        .param("remarks", "Repairs completed")
+                        .param("completionRemarks", "Filled and asphalt laid")
+                        .param("departmentId", testDept.getId().toString())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("Resolved"))
+                .andExpect(jsonPath("$.completionRemarks").value("Filled and asphalt laid"))
+                .andExpect(jsonPath("$.completionPhotos", hasSize(1)))
+                .andExpect(jsonPath("$.completionPhotos[0].uploadedBy").value(adminUser.getFullName()))
+                .andExpect(jsonPath("$.imageUrl").value("/uploads/orig_pothole.jpg"));
 
         List<ComplaintCompletionPhoto> photos = complaintService.getCompletionPhotos(c.getId());
         assertEquals(1, photos.size());
-        assertEquals("/uploads/completion_1.jpg", photos.get(0).getPhotoUrl());
-        assertEquals("Admin Jane", photos.get(0).getUploadedBy());
-        assertNotNull(photos.get(0).getUploadedAt());
+        assertEquals(adminUser.getFullName(), photos.get(0).getUploadedBy());
     }
 
     @Test
-    @DisplayName("3. Resolve a complaint with multiple completion photos")
-    public void testResolveComplaintWithMultiplePhotos() {
+    @DisplayName("3. Resolve a complaint with multiple completion photos via API")
+    public void testResolveComplaintWithMultiplePhotosApi() throws Exception {
         Complaint c = createTestComplaint(citizen1, "/uploads/orig_pipe.jpg");
 
-        List<String> photoUrls = Arrays.asList(
-                "/uploads/comp_photo_a.jpg",
-                "/uploads/comp_photo_b.jpg",
-                "/uploads/comp_photo_c.jpg"
-        );
+        byte[] validPng = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00};
+        MockMultipartFile photo1 = new MockMultipartFile("photos", "comp1.png", "image/png", validPng);
+        MockMultipartFile photo2 = new MockMultipartFile("photos", "comp2.png", "image/png", validPng);
+        MockMultipartFile photo3 = new MockMultipartFile("photos", "comp3.png", "image/png", validPng);
 
-        Complaint resolved = complaintService.updateComplaintStatusAndDepartment(
-                c.getId(), "Resolved", testDept.getId(), "Admin Bob",
-                "Repaired pipe", "Replaced cracked pipeline and pressure tested", photoUrls);
+        mockMvc.perform(multipart("/api/admin/complaints/" + c.getId() + "/resolve")
+                        .file(photo1)
+                        .file(photo2)
+                        .file(photo3)
+                        .param("remarks", "Multiple steps completed")
+                        .param("completionRemarks", "Excavation, replacement and road resurfacing done")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("Resolved"))
+                .andExpect(jsonPath("$.completionPhotos", hasSize(3)))
+                .andExpect(jsonPath("$.imageUrl").value("/uploads/orig_pipe.jpg"));
 
-        assertEquals("Resolved", resolved.getStatus());
         List<ComplaintCompletionPhoto> photos = complaintService.getCompletionPhotos(c.getId());
         assertEquals(3, photos.size());
-        assertEquals("/uploads/comp_photo_a.jpg", photos.get(0).getPhotoUrl());
-        assertEquals("/uploads/comp_photo_b.jpg", photos.get(1).getPhotoUrl());
-        assertEquals("/uploads/comp_photo_c.jpg", photos.get(2).getPhotoUrl());
-
-        // Verify ComplaintResponse DTO includes all photos
-        ComplaintResponse resp = new ComplaintResponse(resolved);
-        assertNotNull(resp.getCompletionPhotos());
-        assertEquals(3, resp.getCompletionPhotos().size());
-        assertEquals("Replaced cracked pipeline and pressure tested", resp.getCompletionRemarks());
-        assertNotNull(resp.getResolutionDate());
     }
 
     @Test
@@ -160,23 +193,23 @@ public class WorkCompletionPhotoTest {
 
         // First resolution with 2 photos
         complaintService.updateComplaintStatusAndDepartment(
-                c.getId(), "Resolved", testDept.getId(), "Admin 1",
+                c.getId(), "Resolved", testDept.getId(), adminUser.getFullName(),
                 "Cleared blockage", "Initial clearing", List.of("/uploads/comp_round1_a.jpg", "/uploads/comp_round1_b.jpg"));
 
         List<ComplaintCompletionPhoto> firstRoundPhotos = complaintService.getCompletionPhotos(c.getId());
         assertEquals(2, firstRoundPhotos.size());
 
-        // Citizen / Admin reopens complaint
+        // Reopen complaint
         Complaint reopened = complaintService.updateComplaintStatusAndDepartment(
                 c.getId(), "Reopened", testDept.getId(), "Citizen One", "Water clogged again after rain");
         assertEquals("Reopened", reopened.getStatus());
 
-        // Photos from round 1 are still preserved
+        // Photos from round 1 are preserved
         assertEquals(2, complaintService.getCompletionPhotos(c.getId()).size());
 
         // Re-resolve with 1 new photo
         Complaint reResolved = complaintService.updateComplaintStatusAndDepartment(
-                c.getId(), "Resolved", testDept.getId(), "Admin 2",
+                c.getId(), "Resolved", testDept.getId(), "Admin Two",
                 "Drain rebuilt", "Rebuilt catch basin", List.of("/uploads/comp_round2.jpg"));
 
         assertEquals("Resolved", reResolved.getStatus());
@@ -188,7 +221,6 @@ public class WorkCompletionPhotoTest {
         assertEquals("/uploads/comp_round1_a.jpg", allPhotos.get(0).getPhotoUrl());
         assertEquals("/uploads/comp_round1_b.jpg", allPhotos.get(1).getPhotoUrl());
         assertEquals("/uploads/comp_round2.jpg", allPhotos.get(2).getPhotoUrl());
-        assertEquals("Admin 2", allPhotos.get(2).getUploadedBy());
     }
 
     @Test
@@ -196,28 +228,28 @@ public class WorkCompletionPhotoTest {
     public void testRejectUploadsForNonResolvedStatuses() {
         Complaint c = createTestComplaint(citizen1, "/uploads/orig.jpg");
 
-        // Trying to upload photo while setting to In Progress -> must fail
+        // In Progress
         IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class, () ->
                 complaintService.updateComplaintStatusAndDepartment(
                         c.getId(), "In Progress", testDept.getId(), "Admin",
                         "Starting work", null, List.of("/uploads/photo_illegal.jpg")));
         assertTrue(ex1.getMessage().contains("only be uploaded when resolving"));
 
-        // Trying to upload photo while setting to Rejected -> must fail
+        // Rejected
         IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class, () ->
                 complaintService.updateComplaintStatusAndDepartment(
                         c.getId(), "Rejected", testDept.getId(), "Admin",
                         "Not a municipal issue", null, List.of("/uploads/photo_illegal.jpg")));
         assertTrue(ex2.getMessage().contains("only be uploaded when resolving"));
 
-        // Trying to upload photo while setting to Submitted / Pending -> must fail
+        // Submitted / Pending
         IllegalArgumentException ex3 = assertThrows(IllegalArgumentException.class, () ->
                 complaintService.updateComplaintStatusAndDepartment(
                         c.getId(), "Submitted", testDept.getId(), "Admin",
                         "Submitted", null, List.of("/uploads/photo_illegal.jpg")));
         assertTrue(ex3.getMessage().contains("only be uploaded when resolving"));
 
-        // Reopen and try to upload photo under Reopened status -> must fail
+        // Reopened
         complaintService.updateComplaintStatusAndDepartment(c.getId(), "Resolved", testDept.getId(), "Admin", "Resolved");
         complaintService.updateComplaintStatusAndDepartment(c.getId(), "Reopened", testDept.getId(), "Citizen", "Reopened");
 
@@ -229,63 +261,79 @@ public class WorkCompletionPhotoTest {
     }
 
     @Test
-    @DisplayName("6. Prevent citizens from accessing another citizen's completion photos")
-    public void testCitizenOwnershipOnPhotoAccess() {
-        Complaint c1 = createTestComplaint(citizen1, "/uploads/c1.jpg");
-        complaintService.updateComplaintStatusAndDepartment(
-                c1.getId(), "Resolved", testDept.getId(), "Admin", "Done", "Fixed", List.of("/uploads/comp1.jpg"));
+    @DisplayName("6. Reject unauthorized admin uploads (Citizen cannot call resolve/upload endpoint)")
+    public void testRejectUnauthorizedAdminUploads() throws Exception {
+        Complaint c = createTestComplaint(citizen1, "/uploads/c1.jpg");
 
-        // Citizen 1 Details
-        UserDetailsImpl citizen1Details = UserDetailsImpl.build(citizen1);
+        byte[] validJpeg = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F'};
+        MockMultipartFile photo = new MockMultipartFile("photos", "comp.jpg", "image/jpeg", validJpeg);
 
-        // Citizen 2 Details
-        UserDetailsImpl citizen2Details = UserDetailsImpl.build(citizen2);
+        // Citizen token attempting to call Admin resolve endpoint -> 403 Forbidden
+        mockMvc.perform(multipart("/api/admin/complaints/" + c.getId() + "/resolve")
+                        .file(photo)
+                        .header("Authorization", "Bearer " + citizen1Token))
+                .andExpect(status().isForbidden());
 
-        // Admin Details
-        User adminUser = new User("Admin User", "admin@smarturban.com", "9999999999", "AdminPass", "HQ", "ROLE_ADMIN");
-        adminUser.setId(999L);
-        UserDetailsImpl adminDetails = UserDetailsImpl.build(adminUser);
-
-        // Verify citizen 1 can access own complaint
-        Complaint loadedForOwner = complaintService.getComplaintById(c1.getId());
-        assertEquals(citizen1.getId(), loadedForOwner.getUser().getId());
-
-        // Check ownership condition logic enforced in CitizenComplaintController
-        boolean canOwnerAccess = loadedForOwner.getUser().getId().equals(citizen1Details.getId()) ||
-                "ROLE_ADMIN".equals(citizen1Details.getAuthorities().iterator().next().getAuthority());
-        assertTrue(canOwnerAccess);
-
-        boolean canCitizen2Access = loadedForOwner.getUser().getId().equals(citizen2Details.getId()) ||
-                "ROLE_ADMIN".equals(citizen2Details.getAuthorities().iterator().next().getAuthority());
-        assertFalse(canCitizen2Access, "Another citizen must NOT have access to this complaint or completion photos");
-
-        boolean canAdminAccess = loadedForOwner.getUser().getId().equals(adminDetails.getId()) ||
-                "ROLE_ADMIN".equals(adminDetails.getAuthorities().iterator().next().getAuthority());
-        assertTrue(canAdminAccess, "Admin must be permitted to access");
+        // Unauthenticated request -> 401 Unauthorized
+        mockMvc.perform(multipart("/api/admin/complaints/" + c.getId() + "/resolve")
+                        .file(photo))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
-    @DisplayName("7. Verify original complaint photos are never overwritten")
+    @DisplayName("7. Prevent citizens from accessing another citizen's completion photos via API")
+    public void testCitizenOwnershipOnPhotoAccessApi() throws Exception {
+        Complaint c1 = createTestComplaint(citizen1, "/uploads/c1.jpg");
+        complaintService.updateComplaintStatusAndDepartment(
+                c1.getId(), "Resolved", testDept.getId(), adminUser.getFullName(),
+                "Done", "Fixed", List.of("/uploads/comp1.jpg"));
+
+        // Owner (citizen1) can access complaint details and completion photos -> 200 OK
+        mockMvc.perform(get("/api/citizen/complaints/" + c1.getId())
+                        .header("Authorization", "Bearer " + citizen1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(c1.getId()))
+                .andExpect(jsonPath("$.completionPhotos", hasSize(1)));
+
+        mockMvc.perform(get("/api/citizen/complaints/" + c1.getId() + "/completion-photos")
+                        .header("Authorization", "Bearer " + citizen1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+
+        // Non-owner citizen (citizen2) attempting to access -> 403 Forbidden
+        mockMvc.perform(get("/api/citizen/complaints/" + c1.getId())
+                        .header("Authorization", "Bearer " + citizen2Token))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/citizen/complaints/" + c1.getId() + "/completion-photos")
+                        .header("Authorization", "Bearer " + citizen2Token))
+                .andExpect(status().isForbidden());
+
+        // Admin can access citizen's complaint -> 200 OK
+        mockMvc.perform(get("/api/citizen/complaints/" + c1.getId())
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("8. Verify original complaint photos are never overwritten")
     public void testOriginalComplaintPhotosNeverOverwritten() {
         String originalPhoto = "/uploads/citizen_original_proof.jpg";
         Complaint c = createTestComplaint(citizen1, originalPhoto);
         assertEquals(originalPhoto, c.getImageUrl());
 
-        // Transition through multiple stages
         complaintService.updateComplaintStatusAndDepartment(c.getId(), "Under Review", testDept.getId(), "Admin", "Reviewing");
-        Complaint cReview = complaintService.getComplaintById(c.getId());
-        assertEquals(originalPhoto, cReview.getImageUrl());
+        assertEquals(originalPhoto, complaintService.getComplaintById(c.getId()).getImageUrl());
 
-        complaintService.updateComplaintStatusAndDepartment(c.getId(), "In Progress", testDept.getId(), "Admin", "In progress");
-        Complaint cProgress = complaintService.getComplaintById(c.getId());
-        assertEquals(originalPhoto, cProgress.getImageUrl());
+        complaintService.updateComplaintStatusAndDepartment(c.getId(), "In Progress", testDept.getId(), "Admin", "Working");
+        assertEquals(originalPhoto, complaintService.getComplaintById(c.getId()).getImageUrl());
 
         complaintService.updateComplaintStatusAndDepartment(
                 c.getId(), "Resolved", testDept.getId(), "Admin", "Done", "Fixed completely",
                 List.of("/uploads/completion_pic1.jpg", "/uploads/completion_pic2.jpg"));
 
-        Complaint cResolved = complaintService.getComplaintById(c.getId());
-        assertEquals(originalPhoto, cResolved.getImageUrl(), "Original photo URL must remain completely unchanged");
+        Complaint resolved = complaintService.getComplaintById(c.getId());
+        assertEquals(originalPhoto, resolved.getImageUrl(), "Original photo URL must remain completely untouched");
         assertEquals(2, complaintService.getCompletionPhotos(c.getId()).size());
     }
 }

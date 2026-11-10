@@ -171,14 +171,17 @@ public class AdminApiController {
             @RequestParam(value = "photos", required = false) List<org.springframework.web.multipart.MultipartFile> photos,
             @AuthenticationPrincipal UserDetailsImpl userDetails) {
 
+        List<String> savedPhotoUrls = new java.util.ArrayList<>();
         try {
-            List<String> photoUrls = new java.util.ArrayList<>();
+            // Validate complaint existence
+            complaintService.getComplaintById(id);
+
             if (photos != null && !photos.isEmpty()) {
                 for (org.springframework.web.multipart.MultipartFile file : photos) {
                     if (file != null && !file.isEmpty()) {
                         String url = fileStorageService.storeFile(file);
                         if (url != null) {
-                            photoUrls.add(url);
+                            savedPhotoUrls.add(url);
                         }
                     }
                 }
@@ -187,9 +190,13 @@ public class AdminApiController {
             String adminName = userDetails != null ? userDetails.getFullName() : "Administrator";
 
             Complaint updated = complaintService.updateComplaintStatusAndDepartment(
-                    id, "Resolved", departmentId, adminName, remarks, completionRemarks, photoUrls);
+                    id, "Resolved", departmentId, adminName, remarks, completionRemarks, savedPhotoUrls);
             return ResponseEntity.ok(new com.smarturban.backend.dto.ComplaintResponse(updated));
-        } catch (IllegalArgumentException | IllegalStateException e) {
+        } catch (Exception e) {
+            // Prevent orphaned files if database operation fails
+            for (String photoUrl : savedPhotoUrls) {
+                fileStorageService.deleteStoredFile(photoUrl);
+            }
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }

@@ -233,24 +233,41 @@ public class AdminWebController {
                                   @RequestParam(value = "remarks", required = false) String remarks,
                                   @RequestParam(value = "completionRemarks", required = false) String completionRemarks,
                                   @RequestParam(value = "completionPhotos", required = false) List<org.springframework.web.multipart.MultipartFile> completionPhotos,
+                                  java.security.Principal principal,
                                   RedirectAttributes redirectAttributes) {
+        List<String> savedPhotoUrls = new java.util.ArrayList<>();
         try {
-            List<String> photoUrls = new java.util.ArrayList<>();
+            // Validate status BEFORE storing files
+            Complaint existing = complaintService.getComplaintById(id);
+            boolean isResolving = (status != null && ("Resolved".equalsIgnoreCase(status.trim()) || "RESOLVED".equalsIgnoreCase(status.trim())))
+                    || (status == null && ("Resolved".equalsIgnoreCase(existing.getStatus()) || "RESOLVED".equalsIgnoreCase(existing.getStatus())));
+
+            boolean hasPhotos = completionPhotos != null && completionPhotos.stream().anyMatch(f -> f != null && !f.isEmpty());
+            if (hasPhotos && !isResolving) {
+                throw new IllegalArgumentException("Completion photos can only be uploaded when resolving a complaint. Current/New status does not permit completion photo upload.");
+            }
+
             if (completionPhotos != null && !completionPhotos.isEmpty()) {
                 for (org.springframework.web.multipart.MultipartFile file : completionPhotos) {
                     if (file != null && !file.isEmpty()) {
                         String url = fileStorageService.storeFile(file);
                         if (url != null) {
-                            photoUrls.add(url);
+                            savedPhotoUrls.add(url);
                         }
                     }
                 }
             }
 
+            String adminName = (principal != null && principal.getName() != null) ? principal.getName() : "Administrator";
+
             complaintService.updateComplaintStatusAndDepartment(
-                    id, status, departmentId, "Administrator", remarks, completionRemarks, photoUrls);
+                    id, status, departmentId, adminName, remarks, completionRemarks, savedPhotoUrls);
             redirectAttributes.addFlashAttribute("success", "Complaint updated successfully.");
         } catch (Exception e) {
+            // Prevent orphaned files if database operation fails
+            for (String photoUrl : savedPhotoUrls) {
+                fileStorageService.deleteStoredFile(photoUrl);
+            }
             redirectAttributes.addFlashAttribute("error", e.getMessage());
         }
         return "redirect:/admin/complaints/" + id;
