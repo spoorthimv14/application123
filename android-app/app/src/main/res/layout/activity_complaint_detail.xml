@@ -145,7 +145,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="Attached Photo"
+                android:text="@string/original_photo_heading"
                 android:textColor="@color/primary_navy"
                 android:textSize="14sp"
                 android:textStyle="bold" />
@@ -157,6 +157,99 @@
                 android:layout_marginTop="8dp"
                 android:scaleType="centerCrop"
                 android:visibility="gone" />
+
+            <!-- Dedicated Work Completion Photos & Resolution Section -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardCompletionDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                app:cardBackgroundColor="#ECFDF5"
+                app:strokeColor="#10B981"
+                app:strokeWidth="1dp"
+                app:cardCornerRadius="10dp"
+                app:cardElevation="1dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/completion_section_title"
+                        android:textColor="#047857"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <!-- Resolution Date -->
+                    <TextView
+                        android:id="@+id/tvResolutionDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Resolution Date: 2026-11-10"
+                        android:textColor="#065F46"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <!-- Completion Remarks -->
+                    <TextView
+                        android:id="@+id/tvCompletionRemarks"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:background="#D1FAE5"
+                        android:padding="10dp"
+                        android:text="Completion remarks..."
+                        android:textColor="#065F46"
+                        android:textSize="13sp"
+                        android:textStyle="italic"
+                        android:visibility="gone" />
+
+                    <!-- Completion Photos Heading -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/completion_photos_title"
+                        android:textColor="#047857"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <!-- Empty State Text -->
+                    <TextView
+                        android:id="@+id/tvNoCompletionPhoto"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="@string/no_completion_photo"
+                        android:textColor="#6B7280"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
+
+                    <!-- Completion Photos Container -->
+                    <HorizontalScrollView
+                        android:id="@+id/scrollCompletionPhotos"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:scrollbars="none"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:id="@+id/containerCompletionPhotos"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
+
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
 
             <!-- Location & Map Section -->
             <TextView
